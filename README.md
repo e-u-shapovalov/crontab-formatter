@@ -85,9 +85,112 @@ format on save:
 }
 ```
 
-The extension registers the `crontab` language id, so it coexists with syntax
-highlighters such as `hogashi.crontab-syntax-highlight` — the highlighter
-colours, this extension formats.
+## Syntax highlighting
+
+The extension ships its own TextMate grammar, so crontab files are coloured out
+of the box — no companion highlighter needed:
+
+- the **schedule** (the five time fields and `@macros`) gets one colour;
+- the **command / path** gets another;
+- the target after **`>`** (overwrite) gets a third colour;
+- the target after **`>>`** (append) gets a fourth — so you can tell at a glance
+  whether a log is being wiped or kept.
+
+Comments, environment assignments (`PATH=…`) and `$VARIABLES` are highlighted
+too. Exact colours come from your active theme.
+
+---
+
+## По-русски
+
+Практичный форматтер для crontab-файлов. Выравнивает расписания в аккуратные
+колонки через родные **Format Document / Format Selection / Format on Save** —
+и никогда не меняет смысл команды или расписания.
+
+### Что делает
+
+- **Выравнивание колонок** временных полей (и колонки `USER` в системном формате).
+- **Команды не трогаются** — кавычки, пайпы, перенаправления, `&&`, `||`, `%`,
+  `$()`, бэктики и внутренний `#` сохраняются байт-в-байт. Внутренние пробелы
+  не нормализуются.
+- **Идемпотентность**: повторное форматирование уже отформатированного файла
+  ничего не меняет.
+- **Поддерживаемые строки**: пользовательский crontab
+  (`MIN HOUR DOM MON DOW COMMAND`), системный crontab / `cron.d` (с колонкой
+  `USER`), макросы (`@reboot`, `@daily`, …), присваивания окружения
+  (`PATH=…`, `MAILTO=…`, `CRON_TZ=…`), комментарии и пустые строки.
+- **Мягкая валидация** (диагностика): диапазоны полей, `*/0`, перевёрнутые
+  диапазоны, неизвестные макросы, отсутствие пользователя в системном режиме,
+  относительные пути и отсутствие перенаправления вывода — всё как
+  предупреждения/подсказки, форматирование не блокируется.
+- **Расшифровка при наведении** на строку расписания (через cronstrue, `ru`/`en`).
+- **Безопасные быстрые исправления** (Code Actions): добавить `>/dev/null 2>&1`,
+  добавить лог-редирект, вставить абсолютный `/usr/bin/php`, объяснить
+  расписание, превратить точное расписание в `@macro` — **только по запросу**.
+
+### Команды
+
+- **Crontab: Format Document** — отформатировать документ.
+- **Crontab: Explain current line** — объяснить текущую строку.
+- **Crontab: Detect Format** — показать формат (user/system), секунды и счётчики строк.
+
+### Настройки
+
+| Параметр | По умолчанию | Описание |
+| --- | --- | --- |
+| `crontabFormatter.mode` | `auto` | Раскладка полей: `auto` / `user` / `system`. |
+| `crontabFormatter.secondsField` | `auto` | Ведущее поле секунд (`auto` = выкл). |
+| `crontabFormatter.yearField` | `auto` | Хвостовое поле года (`auto` = выкл). |
+| `crontabFormatter.alignComments` | `false` | Выравнивать безопасные хвостовые `#`-комментарии. |
+| `crontabFormatter.alignRedirects` | `false` | Выравнивать хвост `>`/`>>`/`2>&1` в свою колонку. |
+| `crontabFormatter.alignEnvEquals` | `false` | Выравнивать `=` в присваиваниях окружения. |
+| `crontabFormatter.insertHeader` | `false` | Вставить вверху напоминание `# min hour day month weekday command`. |
+| `crontabFormatter.preserveIndentation` | `false` | Сохранять ведущие пробелы (выкл = выравнивание от левого края). |
+| `crontabFormatter.minSpacesBetweenColumns` | `2` | Пробелов между колонками. |
+| `crontabFormatter.formatMacros` | `true` | Выравнивать строки `@macro`. |
+| `crontabFormatter.validateOnSave` | `true` | Запускать диагностику. |
+| `crontabFormatter.explainHover` | `true` | Расшифровка расписания при наведении. |
+| `crontabFormatter.locale` | `ru` | Язык интерфейса: `auto` / `ru` / `en`. |
+
+Совет: в панели **Extensions** иконка ⚙️ → **Extension Settings** ведёт прямо к этим настройкам.
+
+### Шпаргалка по перенаправлениям
+
+- `>` перезаписывает файл (старые логи стираются).
+- `>>` дописывает в конец файла.
+- `2>&1` отправляет ошибки (stderr) туда же, куда и вывод (stdout).
+- Частые формы: `command >/dev/null 2>&1` (отбросить) или
+  `command >>/var/log/x.log 2>&1` (вести лог).
+
+Валидатор отмечает пропущенные/неполные/кривые перенаправления (например `>1&2`)
+и предлагает правильную форму, а ввод `*` на пустой строке предложит заполнить
+всё расписание.
+
+### Использование
+
+Откройте crontab-файл и выполните **Format Document** (`Shift+Alt+F`) или
+включите форматирование при сохранении:
+
+```jsonc
+"[crontab]": {
+  "editor.defaultFormatter": "EvgeniiShapovalov.crontab-formatter",
+  "editor.formatOnSave": true
+}
+```
+
+### Подсветка синтаксиса
+
+Расширение поставляется с собственной TextMate-грамматикой, поэтому
+crontab-файлы раскрашиваются из коробки — отдельный подсветчик не нужен:
+
+- **расписание** (пять временных полей и `@macros`) — одним цветом;
+- **команда / путь** — другим;
+- цель после **`>`** (перезапись) — третьим цветом;
+- цель после **`>>`** (дозапись) — четвёртым, чтобы сразу видеть, затирается
+  лог или дописывается.
+
+Комментарии, присваивания окружения (`PATH=…`) и `$ПЕРЕМЕННЫЕ` тоже
+подсвечиваются. Конкретные цвета берутся из вашей активной темы.
 
 ## License
 

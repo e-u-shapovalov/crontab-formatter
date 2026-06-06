@@ -1,8 +1,8 @@
 {
   "name": "crontab-formatter",
   "displayName": "Crontab Formatter",
-  "description": "Aligns crontab files into clean columns. Native Format Document / Format Selection / Format on Save, soft validation, schedule explanations and safe quick fixes.",
-  "version": "0.2.0",
+  "description": "%ext.description%",
+  "version": "0.3.0",
   "publisher": "EvgeniiShapovalov",
   "icon": "images/cronformat.png",
   "author": "EvgeniiShapovalov (https://github.com/e-u-shapovalov)",
@@ -70,18 +70,30 @@
         "configuration": "./language-configuration.json"
       }
     ],
+    "grammars": [
+      {
+        "language": "crontab",
+        "scopeName": "source.crontab",
+        "path": "./syntaxes/crontab.tmLanguage.json"
+      },
+      {
+        "language": "cron",
+        "scopeName": "source.crontab",
+        "path": "./syntaxes/crontab.tmLanguage.json"
+      }
+    ],
     "commands": [
       {
         "command": "crontab.formatDocument",
-        "title": "Crontab: Format Document"
+        "title": "%cmd.formatDocument.title%"
       },
       {
         "command": "crontab.explainLine",
-        "title": "Crontab: Explain current line"
+        "title": "%cmd.explainLine.title%"
       },
       {
         "command": "crontab.detectFormat",
-        "title": "Crontab: Detect Format"
+        "title": "%cmd.detectFormat.title%"
       }
     ],
     "menus": {
@@ -101,7 +113,7 @@
       ]
     },
     "configuration": {
-      "title": "Crontab Formatter",
+      "title": "%config.title%",
       "properties": {
         "crontabFormatter.mode": {
           "type": "string",
@@ -110,8 +122,13 @@
             "user",
             "system"
           ],
+          "enumDescriptions": [
+            "%config.mode.enum.auto%",
+            "%config.mode.enum.user%",
+            "%config.mode.enum.system%"
+          ],
           "default": "auto",
-          "markdownDescription": "Crontab format. `user` = `MIN HOUR DOM MON DOW COMMAND`; `system` = adds a USER field (e.g. /etc/crontab, cron.d); `auto` detects from filename and content."
+          "markdownDescription": "%config.mode.desc%"
         },
         "crontabFormatter.secondsField": {
           "type": "string",
@@ -120,8 +137,13 @@
             "true",
             "false"
           ],
+          "enumDescriptions": [
+            "%config.secondsField.enum.auto%",
+            "%config.secondsField.enum.true%",
+            "%config.secondsField.enum.false%"
+          ],
           "default": "auto",
-          "description": "Leading seconds field (6/7-field cron). 'auto' currently behaves as false to avoid breaking standard crontab."
+          "markdownDescription": "%config.secondsField.desc%"
         },
         "crontabFormatter.yearField": {
           "type": "string",
@@ -130,54 +152,59 @@
             "true",
             "false"
           ],
+          "enumDescriptions": [
+            "%config.yearField.enum.auto%",
+            "%config.yearField.enum.true%",
+            "%config.yearField.enum.false%"
+          ],
           "default": "auto",
-          "description": "Trailing year field. 'auto' behaves as false by default."
+          "markdownDescription": "%config.yearField.desc%"
         },
         "crontabFormatter.alignComments": {
           "type": "boolean",
           "default": false,
-          "description": "Align safe trailing inline comments into their own column (a # outside quotes)."
+          "markdownDescription": "%config.alignComments.desc%"
         },
         "crontabFormatter.alignRedirects": {
           "type": "boolean",
           "default": false,
-          "description": "Align the redirection tail (>, >>, 2>&1) into its own column so you can see where logs go."
+          "markdownDescription": "%config.alignRedirects.desc%"
         },
         "crontabFormatter.alignEnvEquals": {
           "type": "boolean",
           "default": false,
-          "description": "Softly align environment assignments on the '=' sign."
+          "markdownDescription": "%config.alignEnvEquals.desc%"
         },
         "crontabFormatter.insertHeader": {
           "type": "boolean",
           "default": false,
-          "description": "Insert a '# min hour day month weekday command' reminder header at the top."
+          "markdownDescription": "%config.insertHeader.desc%"
         },
         "crontabFormatter.preserveIndentation": {
           "type": "boolean",
           "default": false,
-          "description": "Keep each line's existing leading whitespace. Off by default so columns align from the left edge."
+          "markdownDescription": "%config.preserveIndentation.desc%"
         },
         "crontabFormatter.minSpacesBetweenColumns": {
           "type": "integer",
           "default": 2,
           "minimum": 1,
-          "description": "Minimum number of spaces between aligned columns."
+          "markdownDescription": "%config.minSpacesBetweenColumns.desc%"
         },
         "crontabFormatter.formatMacros": {
           "type": "boolean",
           "default": true,
-          "description": "Align @reboot/@daily/... macros."
+          "markdownDescription": "%config.formatMacros.desc%"
         },
         "crontabFormatter.validateOnSave": {
           "type": "boolean",
           "default": true,
-          "description": "Run soft validation diagnostics on save."
+          "markdownDescription": "%config.validateOnSave.desc%"
         },
         "crontabFormatter.explainHover": {
           "type": "boolean",
           "default": true,
-          "description": "Show a human-readable schedule explanation on hover."
+          "markdownDescription": "%config.explainHover.desc%"
         },
         "crontabFormatter.locale": {
           "type": "string",
@@ -186,8 +213,13 @@
             "ru",
             "en"
           ],
+          "enumDescriptions": [
+            "%config.locale.enum.auto%",
+            "%config.locale.enum.ru%",
+            "%config.locale.enum.en%"
+          ],
           "default": "ru",
-          "description": "UI language for messages, hints and explanations. 'auto' follows the VS Code display language. Default: Russian."
+          "markdownDescription": "%config.locale.desc%"
         }
       }
     }

@@ -1,0 +1,89 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "Crontab",
+  "scopeName": "source.crontab",
+  "patterns": [
+    { "include": "#comment" },
+    { "include": "#environment" },
+    { "include": "#macro" },
+    { "include": "#schedule" }
+  ],
+  "repository": {
+    "comment": {
+      "match": "^\\s*#.*$",
+      "name": "comment.line.number-sign.crontab"
+    },
+    "environment": {
+      "match": "^\\s*([A-Za-z_][A-Za-z0-9_]*)\\s*(=)(.*)$",
+      "captures": {
+        "1": { "name": "variable.other.cron-env.crontab" },
+        "2": { "name": "keyword.operator.assignment.crontab" },
+        "3": { "name": "string.unquoted.cron-env-value.crontab" }
+      }
+    },
+    "macro": {
+      "begin": "^\\s*(@(?:reboot|yearly|annually|monthly|weekly|daily|midnight|hourly))\\b",
+      "beginCaptures": {
+        "1": { "name": "constant.numeric.cron-field.crontab" }
+      },
+      "end": "$",
+      "patterns": [{ "include": "#command-tail" }]
+    },
+    "schedule": {
+      "begin": "^\\s*([^\\s]+)\\s+([^\\s]+)\\s+([^\\s]+)\\s+([^\\s]+)\\s+([^\\s]+)(?=\\s|$)",
+      "beginCaptures": {
+        "1": { "name": "constant.numeric.cron-field.crontab" },
+        "2": { "name": "constant.numeric.cron-field.crontab" },
+        "3": { "name": "constant.numeric.cron-field.crontab" },
+        "4": { "name": "constant.numeric.cron-field.crontab" },
+        "5": { "name": "constant.numeric.cron-field.crontab" }
+      },
+      "end": "$",
+      "patterns": [{ "include": "#command-tail" }]
+    },
+    "command-tail": {
+      "patterns": [
+        { "include": "#string" },
+        { "include": "#variable" },
+        {
+          "match": "(\\d+>&\\d+|>&\\d+|&>)",
+          "name": "keyword.operator.cron-redirect.crontab"
+        },
+        {
+          "match": "(\\d*>>)\\s*([^\\s>&|;]+)?",
+          "captures": {
+            "1": { "name": "keyword.operator.cron-redirect.crontab" },
+            "2": { "name": "keyword.control.cron-redirect-append.crontab" }
+          }
+        },
+        {
+          "match": "(\\d*>)\\s*([^\\s>&|;]+)?",
+          "captures": {
+            "1": { "name": "keyword.operator.cron-redirect.crontab" },
+            "2": { "name": "string.unquoted.cron-redirect-write.crontab" }
+          }
+        },
+        { "match": "[^\\s>]+", "name": "entity.name.function.cron-command.crontab" }
+      ]
+    },
+    "string": {
+      "patterns": [
+        {
+          "name": "string.quoted.double.crontab",
+          "begin": "\"",
+          "end": "\"",
+          "patterns": [{ "include": "#variable" }]
+        },
+        {
+          "name": "string.quoted.single.crontab",
+          "begin": "'",
+          "end": "'"
+        }
+      ]
+    },
+    "variable": {
+      "match": "\\$\\{?[A-Za-z_][A-Za-z0-9_]*\\}?",
+      "name": "variable.other.cron-var.crontab"
+    }
+  }
+}

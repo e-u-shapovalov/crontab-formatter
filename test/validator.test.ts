@@ -64,6 +64,18 @@ test("> inside $(...) is not counted as an output redirect", () => {
   assert.ok(!c.includes("stderr-not-redirected"), JSON.stringify(c));
 });
 
+test("a > inside a trailing comment is not counted as a redirect", () => {
+  const c = codes("* * * * * cmd # example > /tmp/log");
+  assert.ok(c.includes("no-redirect"), JSON.stringify(c));
+  assert.ok(!c.includes("stderr-not-redirected"), JSON.stringify(c));
+});
+
+test("a clean redirect before a trailing comment is recognised as complete", () => {
+  const c = codes("* * * * * cmd >/tmp/log 2>&1 # note");
+  assert.ok(!c.includes("no-redirect"), JSON.stringify(c));
+  assert.ok(!c.includes("stderr-not-redirected"), JSON.stringify(c));
+});
+
 test("system mode without a user is flagged", () => {
   const c = codes("0 0 * * * /bin/x >/dev/null 2>&1", s({ mode: "system" }));
   assert.ok(c.includes("missing-user"));

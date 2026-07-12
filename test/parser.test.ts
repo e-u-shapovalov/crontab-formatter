@@ -24,3 +24,10 @@ test("system layout is NOT triggered by cron.daily / mycron.d look-alikes", () =
   assert.equal(detectsSystem("/home/user/mycron.d"), false);
   assert.equal(detectsSystem("/home/user/my.crontab"), false);
 });
+
+test("etc_crontab / crontab.system aliases match as components, not substrings", () => {
+  assert.equal(detectsSystem("/tmp/etc_crontab"), true);
+  assert.equal(detectsSystem("/var/spool/crontab.system"), true);
+  assert.equal(detectsSystem("/home/etc_crontab_notes"), false);
+  assert.equal(detectsSystem("/home/my-crontab.system.bak"), false);
+});

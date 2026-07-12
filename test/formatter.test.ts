@@ -423,3 +423,38 @@ test("hasTopLevelStderrRedirect ignores stderr redirects inside $()", () => {
   assert.equal(hasTopLevelStderrRedirect("echo $(x 2>&1)"), false);
   assert.equal(hasTopLevelStderrRedirect("cmd > /log"), false);
 });
+
+// 26. alignRedirects must never split a fd/operator fused to the command word,
+// which would change the executable or arguments (byte-for-byte contract).
+test("alignRedirects does not split a digit fused to the command word", () => {
+  for (const cmd of [
+    "python2>/tmp/out",
+    "echo version2>/tmp/out",
+    "cat <>/tmp/state",
+    "cat 3<>/tmp/state",
+  ]) {
+    const out = formatDocument(
+      "0 0 * * * " + cmd,
+      s({ mode: "user", alignRedirects: true })
+    );
+    assert.equal(out, "0  0  *  *  *  " + cmd, cmd);
+  }
+});
+
+test("alignRedirects still splits a standalone fd redirect", () => {
+  const out = formatDocument(
+    "0 0 * * * cmd 2>&1",
+    s({ mode: "user", alignRedirects: true })
+  );
+  assert.equal(out, "0  0  *  *  *  cmd  2>&1");
+});
+
+// 27. the shared scanner handles backslash escaping and process substitution
+test("maskNonTopLevel-based helpers handle escaping and process substitution", () => {
+  // an escaped opening quote must not hide a real top-level redirect
+  assert.equal(hasTopLevelRedirect('printf \\"hi\\" > /log'), true);
+  // an escaped > is a literal, not a redirect
+  assert.equal(hasTopLevelRedirect("echo a \\> b"), false);
+  // > inside a process substitution is not the job's redirect
+  assert.equal(hasTopLevelRedirect("diff <(cmd >f) <(cmd2)"), false);
+});

@@ -1,7 +1,11 @@
 import * as vscode from "vscode";
 import { FormatterSettings, Locale } from "./types";
 import { parseDocument, resolveFormat, splitLeadingTokens } from "./parser";
-import { hasTopLevelRedirect, hasTopLevelStderrRedirect } from "./formatter";
+import {
+  hasTopLevelRedirect,
+  hasTopLevelStderrRedirect,
+  detectTrailingComment,
+} from "./formatter";
 import { t } from "./i18n";
 
 /**
@@ -22,7 +26,10 @@ function scriptBaseName(command: string): string {
   const first = splitLeadingTokens(command, 1).tokens[0] ?? "";
   const base = first.split("/").pop() ?? "";
   const name = base.replace(/\.[^.]+$/, "");
-  return name || "cron";
+  // The result is interpolated into a shell redirect, so keep only characters
+  // that are safe there; anything else (`;`, `&`, `$`, quotes, …) is dropped.
+  const safe = name.replace(/[^A-Za-z0-9._-]/g, "");
+  return safe || "cron";
 }
 
 export class CrontabCodeActionProvider implements vscode.CodeActionProvider {
@@ -65,31 +72,46 @@ export class CrontabCodeActionProvider implements vscode.CodeActionProvider {
       commandStart = parsed.raw.length - parsed.remainder.length;
     }
 
-    if (command !== undefined && command.trim() !== "") {
-      const hasRedirect = hasTopLevelRedirect(command);
-      const hasStderr = hasTopLevelStderrRedirect(command);
+    if (
+      command !== undefined &&
+      commandStart !== undefined &&
+      command.trim() !== ""
+    ) {
+      // A trailing shell comment is not part of the command: analyse only the
+      // code before it, and insert redirect fixes before the comment (not at
+      // end-of-line, where they would be commented out).
+      const tc = detectTrailingComment(command);
+      const code = tc ? tc.code : command;
+      const insertPos = tc
+        ? new vscode.Position(lineIndex, commandStart + tc.code.length)
+        : eolPos;
 
-      if (!hasRedirect) {
-        actions.push(
-          this.appendAction(document, eolPos, " >/dev/null 2>&1", t(locale, "action.devnull"))
-        );
-        actions.push(
-          this.appendAction(
-            document,
-            eolPos,
-            ` >>/var/log/${scriptBaseName(command)}.log 2>&1`,
-            t(locale, "action.log", scriptBaseName(command))
-          )
-        );
-      } else if (!hasStderr) {
-        // stdout is redirected but stderr is not — offer to append 2>&1.
-        actions.push(
-          this.appendAction(document, eolPos, " 2>&1", t(locale, "action.stderr"))
-        );
+      if (code.trim() !== "") {
+        const hasRedirect = hasTopLevelRedirect(code);
+        const hasStderr = hasTopLevelStderrRedirect(code);
+
+        if (!hasRedirect) {
+          actions.push(
+            this.appendAction(document, insertPos, " >/dev/null 2>&1", t(locale, "action.devnull"))
+          );
+          actions.push(
+            this.appendAction(
+              document,
+              insertPos,
+              ` >>/var/log/${scriptBaseName(code)}.log 2>&1`,
+              t(locale, "action.log", scriptBaseName(code))
+            )
+          );
+        } else if (!hasStderr) {
+          // stdout is redirected but stderr is not — offer to append 2>&1.
+          actions.push(
+            this.appendAction(document, insertPos, " 2>&1", t(locale, "action.stderr"))
+          );
+        }
       }
 
       // Insert absolute php path when the command starts with bare `php`.
-      if (commandStart !== undefined && /^php(\s|$)/.test(command)) {
+      if (/^php(\s|$)/.test(code)) {
         const start = document.positionAt(
           document.offsetAt(new vscode.Position(lineIndex, 0)) +
             commandStart

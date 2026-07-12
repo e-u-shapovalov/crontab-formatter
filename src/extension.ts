@@ -210,6 +210,16 @@ export function activate(context: vscode.ExtensionContext) {
   // One debounce timer per document, so editing one open crontab does not cancel
   // a pending re-validation of another.
   const debounces = new Map<string, NodeJS.Timeout>();
+  // Cancel any pending debounce timers when the extension is disposed, so a late
+  // callback can't run diagnostics against an already-disposed collection.
+  context.subscriptions.push({
+    dispose() {
+      for (const timer of debounces.values()) {
+        clearTimeout(timer);
+      }
+      debounces.clear();
+    },
+  });
   const scheduleDiagnostics = (document: vscode.TextDocument) => {
     const key = document.uri.toString();
     const pending = debounces.get(key);

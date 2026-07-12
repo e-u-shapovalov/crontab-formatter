@@ -11,7 +11,7 @@ import {
   isUsername,
 } from "./parser";
 import { getFieldMetas, analyzeField } from "./fields";
-import { maskNonTopLevel } from "./formatter";
+import { maskNonTopLevel, detectTrailingComment } from "./formatter";
 import { fieldName, t } from "./i18n";
 
 interface RedirectInfo {
@@ -51,13 +51,16 @@ export function validateDocument(
     const push = (message: string, severity: Diagnostic["severity"], code: string) =>
       diags.push({ line: line.lineNumber, startCol, endCol, message, severity, code });
 
-    // Shared command-quality hints (cron + macro).
+    // Shared command-quality hints (cron + macro). A trailing shell comment is
+    // not part of the executable command, so redirect checks look only at the
+    // code before it.
     const commandHints = (cmd: string) => {
-      const trimmed = cmd.trim();
-      if (trimmed === "") {
+      const tc = detectTrailingComment(cmd);
+      const code = tc ? tc.code : cmd;
+      if (code.trim() === "") {
         return;
       }
-      const r = analyzeRedirects(cmd);
+      const r = analyzeRedirects(code);
       if (r.bad) {
         push(t(locale, "bad-redirect", r.bad), "warning", "bad-redirect");
       }

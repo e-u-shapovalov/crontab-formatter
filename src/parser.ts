@@ -58,7 +58,7 @@ function detectEol(text: string): "\n" | "\r\n" {
 }
 
 const SYSTEM_FILENAME_RE =
-  /(^|[\\/])etc[\\/]crontab$|(^|[\\/])cron\.d(?=[\\/]|$)|etc_crontab|crontab\.system/i;
+  /(^|[\\/])etc[\\/]crontab$|(^|[\\/])cron\.d(?=[\\/]|$)|(^|[\\/])etc_crontab(?=[\\/]|$)|(^|[\\/])crontab\.system(?=[\\/]|$)/i;
 
 function autoDetectUser(
   text: string,

@@ -20,27 +20,41 @@ const HEADER_LABEL: Record<string, string> = {
 };
 
 /**
- * Blank out every character that lives inside single/double quotes, backticks
- * or a `$(...)` command substitution, preserving length. Callers scan the mask
- * for a *top-level* `>` or `#` and then slice the original string at the same
- * index, so a redirect or `#` hidden inside a command is never split off.
+ * Blank out every character that lives inside single/double quotes, backticks,
+ * a `$(...)` command substitution or a `<(...)`/`>(...)` process substitution,
+ * preserving length. A backslash escapes the next character (except inside
+ * single quotes, where nothing is special), so `\"`, `\>` and `\#` are treated
+ * as literals rather than opening a quote or a redirect/comment. Callers scan
+ * the mask for a *top-level* `>` or `#` and slice the original string at the
+ * same index, so a redirect or `#` hidden inside a command is never split off.
  */
 export function maskNonTopLevel(s: string): string {
   let out = "";
   let inS = false;
   let inD = false;
   let inB = false;
-  let depth = 0; // $(...) nesting
+  let depth = 0; // $( / <( / >( nesting
   for (let i = 0; i < s.length; i++) {
     const c = s[i];
+    // Single quotes are fully literal — no escaping, no nesting.
     if (inS) {
       out += " ";
       if (c === "'") inS = false;
       continue;
     }
+    // A backslash escapes the following character everywhere else; mask both so
+    // the escaped char can never act as a delimiter.
+    if (c === "\\") {
+      out += " ";
+      if (i + 1 < s.length) {
+        out += " ";
+        i++;
+      }
+      continue;
+    }
     if (inD) {
       out += " ";
-      if (c === '"' && s[i - 1] !== "\\") inD = false;
+      if (c === '"') inD = false;
       continue;
     }
     if (inB) {
@@ -51,9 +65,10 @@ export function maskNonTopLevel(s: string): string {
     if (c === "'") { inS = true; out += " "; continue; }
     if (c === '"') { inD = true; out += " "; continue; }
     if (c === "`") { inB = true; out += " "; continue; }
-    if (c === "$" && s[i + 1] === "(") {
+    // Command / process substitution: `$(`, `<(`, `>(`.
+    if ((c === "$" || c === "<" || c === ">") && s[i + 1] === "(") {
       depth++;
-      out += "  "; // blank both `$` and `(`
+      out += "  "; // blank both the leading char and `(`
       i++;
       continue;
     }
@@ -88,8 +103,12 @@ export function detectTrailingComment(
 /**
  * Split a command at its first top-level output redirection, so the redirect
  * tail can be aligned into its own column. A `>` inside quotes/backticks or a
- * `$(...)` substitution is ignored. fd digits and `&` directly preceding `>`
- * are kept with the redirect (e.g. `2>&1`, `&>file`).
+ * substitution is ignored. A file-descriptor / `&` prefix (`2>&1`, `&>file`) is
+ * kept with the redirect only when it is a standalone shell token — preceded by
+ * whitespace or the start of the command. When the operator is fused to the
+ * preceding word (`python2>`, `cmd&>`) or is a compound read/write redirect
+ * (`<>`), the split would change the command, so we skip alignment (return null)
+ * to keep the command byte-for-byte intact.
  */
 export function detectRedirect(
   code: string
@@ -103,6 +122,12 @@ export function detectRedirect(
     const p = code[start - 1];
     if (p === "&" || /[0-9]/.test(p)) start--;
     else break;
+  }
+  // The redirect operator (with any fd/& prefix) must be a standalone token.
+  // If a non-whitespace character precedes it, it is fused to the previous word
+  // (or is a `<>`/`3<>` compound) — splitting would alter the command.
+  if (start > 0 && !/\s/.test(code[start - 1])) {
+    return null;
   }
   const body = code.slice(0, start).replace(/\s+$/, "");
   if (body === "") {

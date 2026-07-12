@@ -8,7 +8,7 @@ import cronstrue from "cronstrue/i18n";
 
 import { FormatterSettings, Locale, MACROS } from "./types";
 import { resolveFormat, parseDocument } from "./parser";
-import { getFieldMetas } from "./fields";
+import { getFieldMetas, analyzeField } from "./fields";
 import { t } from "./i18n";
 
 function explainExpression(expr: string, locale: Locale): string | null {
@@ -51,17 +51,21 @@ export function explainLine(
 
   if (line.kind === "cron" && line.complete) {
     const metas = getFieldMetas(fmt);
-    // Build the 5 core fields (minute,hour,dom,month,dow), optionally prefixed
-    // with seconds. Year is never included.
-    const parts: string[] = [];
+    // Don't offer an explanation for a schedule the validator rejects as having a
+    // zero step — cronstrue would otherwise render a meaningless "every 0 …".
     for (let i = 0; i < metas.length; i++) {
-      if (metas[i].name === "year") {
-        continue;
+      if (analyzeField(line.fields[i], metas[i]).some((x) => x.code === "zero-step")) {
+        return null;
       }
-      parts.push(line.fields[i]);
     }
-    const expr = parts.join(" ");
-    return explainExpression(expr, locale);
+    const parts = line.fields.slice(0, metas.length);
+    // cronstrue reads a 6-field expression as seconds-first; when the layout has
+    // a year but no seconds, prepend a 0-seconds field so the trailing value is
+    // unambiguously the year (7 fields).
+    if (fmt.yearEnabled && !fmt.secondsEnabled) {
+      parts.unshift("0");
+    }
+    return explainExpression(parts.join(" "), locale);
   }
 
   return null;

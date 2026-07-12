@@ -57,6 +57,13 @@ test("# inside quotes is not treated as a comment for redirect checks", () => {
   assert.ok(c.includes("no-redirect"), JSON.stringify(c));
 });
 
+test("> inside $(...) is not counted as an output redirect", () => {
+  // the > redirects the subshell's echo, not the cron job's stdout
+  const c = codes("* * * * * sh -c $(echo hi > /tmp/x)");
+  assert.ok(c.includes("no-redirect"), JSON.stringify(c));
+  assert.ok(!c.includes("stderr-not-redirected"), JSON.stringify(c));
+});
+
 test("system mode without a user is flagged", () => {
   const c = codes("0 0 * * * /bin/x >/dev/null 2>&1", s({ mode: "system" }));
   assert.ok(c.includes("missing-user"));

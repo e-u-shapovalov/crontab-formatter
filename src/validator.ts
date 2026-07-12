@@ -11,38 +11,8 @@ import {
   isUsername,
 } from "./parser";
 import { getFieldMetas, analyzeField } from "./fields";
+import { maskNonTopLevel } from "./formatter";
 import { fieldName, t } from "./i18n";
-
-/** Replace quoted/backtick spans with spaces so redirect checks ignore them. */
-function stripQuotes(s: string): string {
-  let out = "";
-  let inS = false;
-  let inD = false;
-  let inB = false;
-  for (let i = 0; i < s.length; i++) {
-    const c = s[i];
-    if (inS) {
-      if (c === "'") inS = false;
-      out += " ";
-      continue;
-    }
-    if (inD) {
-      if (c === '"' && s[i - 1] !== "\\") inD = false;
-      out += " ";
-      continue;
-    }
-    if (inB) {
-      if (c === "`") inB = false;
-      out += " ";
-      continue;
-    }
-    if (c === "'") { inS = true; out += " "; continue; }
-    if (c === '"') { inD = true; out += " "; continue; }
-    if (c === "`") { inB = true; out += " "; continue; }
-    out += c;
-  }
-  return out;
-}
 
 interface RedirectInfo {
   hasOut: boolean;
@@ -51,7 +21,7 @@ interface RedirectInfo {
 }
 
 function analyzeRedirects(command: string): RedirectInfo {
-  const code = stripQuotes(command);
+  const code = maskNonTopLevel(command);
   const badMatch = code.match(/>\s*\d+\s*&\s*\d*/);
   return {
     hasOut: code.includes(">"),

@@ -363,10 +363,43 @@ test("alignRedirects and insertHeader are idempotent", () => {
       "0 0 * * * /script.sh > /var/log/s.log 2>&1 # daily",
       s({ mode: "user", alignRedirects: true, alignComments: true }),
     ],
+    [
+      "0 0 * * * echo $(date > /tmp/x) > /var/log/s.log 2>&1 # note",
+      s({ mode: "user", alignRedirects: true, alignComments: true }),
+    ],
   ];
   for (const [input, settings] of samples) {
     const once = formatDocument(input, settings);
     const twice = formatDocument(once, settings);
     assert.equal(twice, once, `not idempotent for: ${JSON.stringify(input)}`);
   }
+});
+
+// 24. command substitution $(...) is never mistaken for a redirect or comment
+test("alignRedirects does not split a > inside $(...)", () => {
+  const cmd = "echo $(date > /tmp/foo)";
+  const input = "0 0 * * * " + cmd;
+  const out = formatDocument(input, s({ mode: "user", alignRedirects: true }));
+  assert.equal(out, "0  0  *  *  *  " + cmd);
+});
+
+test("alignComments does not split a # inside $(...)", () => {
+  const cmd = "echo $(echo # inside)";
+  const input = "0 0 * * * " + cmd;
+  const out = formatDocument(input, s({ mode: "user", alignComments: true }));
+  assert.equal(out, "0  0  *  *  *  " + cmd);
+});
+
+test("alignRedirects still aligns a real redirect after a $() body", () => {
+  const input = [
+    "0 0 * * * echo $(date) > /var/log/a.log 2>&1",
+    "0 0 * * * /bin/b $(id) > /var/log/b.log 2>&1",
+  ].join("\n");
+  const out = formatDocument(input, s({ mode: "user", alignRedirects: true }));
+  const lines = out.split("\n");
+  const c0 = lines[0].indexOf("> /var/log");
+  const c1 = lines[1].indexOf("> /var/log");
+  assert.ok(c0 > 0 && c0 === c1, out);
+  assert.ok(out.includes("echo $(date)"), out);
+  assert.ok(out.includes("/bin/b $(id)"), out);
 });

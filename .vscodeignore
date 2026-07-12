@@ -8,3 +8,9 @@ out/test/**
 **/*.map
 **/*.ts
 *.vsix
+node_modules/cronstrue/locales/**
+node_modules/cronstrue/dist/cronstrue.js
+node_modules/cronstrue/dist/cronstrue.min.js
+node_modules/cronstrue/dist/cronstrue-i18n.min.js
+node_modules/cronstrue/bin/**
+node_modules/cronstrue/README.md

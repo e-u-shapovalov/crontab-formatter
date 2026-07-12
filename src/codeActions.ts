@@ -113,12 +113,12 @@ export class CrontabCodeActionProvider implements vscode.CodeActionProvider {
       parsed.kind === "macro"
     ) {
       const explain = new vscode.CodeAction(
-        "Crontab: объяснить расписание",
+        t(locale, "action.explain"),
         vscode.CodeActionKind.QuickFix
       );
       explain.command = {
         command: "crontab.explainLine",
-        title: "Explain schedule",
+        title: t(locale, "action.explain"),
         arguments: [lineIndex],
       };
       actions.push(explain);
@@ -141,7 +141,7 @@ export class CrontabCodeActionProvider implements vscode.CodeActionProvider {
           " " +
           rest;
         const action = new vscode.CodeAction(
-          `Crontab: преобразовать в ${match.macro}`,
+          t(locale, "action.convert", match.macro),
           vscode.CodeActionKind.RefactorRewrite
         );
         action.edit = new vscode.WorkspaceEdit();

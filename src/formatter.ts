@@ -20,33 +20,65 @@ const HEADER_LABEL: Record<string, string> = {
 };
 
 /**
- * Detect a trailing inline comment that is safe to split off (a `#` outside any
- * quotes/backticks, preceded by whitespace). Returns null when none is found.
+ * Blank out every character that lives inside single/double quotes, backticks
+ * or a `$(...)` command substitution, preserving length. Callers scan the mask
+ * for a *top-level* `>` or `#` and then slice the original string at the same
+ * index, so a redirect or `#` hidden inside a command is never split off.
  */
-export function detectTrailingComment(
-  cmd: string
-): { code: string; comment: string } | null {
+export function maskNonTopLevel(s: string): string {
+  let out = "";
   let inS = false;
   let inD = false;
   let inB = false;
-  for (let i = 0; i < cmd.length; i++) {
-    const c = cmd[i];
+  let depth = 0; // $(...) nesting
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
     if (inS) {
+      out += " ";
       if (c === "'") inS = false;
       continue;
     }
     if (inD) {
-      if (c === '"' && cmd[i - 1] !== "\\") inD = false;
+      out += " ";
+      if (c === '"' && s[i - 1] !== "\\") inD = false;
       continue;
     }
     if (inB) {
+      out += " ";
       if (c === "`") inB = false;
       continue;
     }
-    if (c === "'") { inS = true; continue; }
-    if (c === '"') { inD = true; continue; }
-    if (c === "`") { inB = true; continue; }
-    if (c === "#" && i > 0 && /\s/.test(cmd[i - 1])) {
+    if (c === "'") { inS = true; out += " "; continue; }
+    if (c === '"') { inD = true; out += " "; continue; }
+    if (c === "`") { inB = true; out += " "; continue; }
+    if (c === "$" && s[i + 1] === "(") {
+      depth++;
+      out += "  "; // blank both `$` and `(`
+      i++;
+      continue;
+    }
+    if (depth > 0) {
+      if (c === "(") depth++;
+      else if (c === ")") depth--;
+      out += " ";
+      continue;
+    }
+    out += c;
+  }
+  return out;
+}
+
+/**
+ * Detect a trailing inline comment that is safe to split off (a `#` outside any
+ * quotes/backticks/`$(...)`, preceded by whitespace). Returns null when none is
+ * found.
+ */
+export function detectTrailingComment(
+  cmd: string
+): { code: string; comment: string } | null {
+  const mask = maskNonTopLevel(cmd);
+  for (let i = 0; i < mask.length; i++) {
+    if (mask[i] === "#" && i > 0 && /\s/.test(cmd[i - 1])) {
       return { code: cmd.slice(0, i).replace(/\s+$/, ""), comment: cmd.slice(i) };
     }
   }
@@ -54,48 +86,29 @@ export function detectTrailingComment(
 }
 
 /**
- * Split a command at its first top-level (unquoted) output redirection, so the
- * redirect tail can be aligned into its own column. fd digits and `&` directly
- * preceding `>` are kept with the redirect (e.g. `2>&1`, `&>file`).
+ * Split a command at its first top-level output redirection, so the redirect
+ * tail can be aligned into its own column. A `>` inside quotes/backticks or a
+ * `$(...)` substitution is ignored. fd digits and `&` directly preceding `>`
+ * are kept with the redirect (e.g. `2>&1`, `&>file`).
  */
 export function detectRedirect(
   code: string
 ): { body: string; redirect: string } | null {
-  let inS = false;
-  let inD = false;
-  let inB = false;
-  for (let i = 0; i < code.length; i++) {
-    const c = code[i];
-    if (inS) {
-      if (c === "'") inS = false;
-      continue;
-    }
-    if (inD) {
-      if (c === '"' && code[i - 1] !== "\\") inD = false;
-      continue;
-    }
-    if (inB) {
-      if (c === "`") inB = false;
-      continue;
-    }
-    if (c === "'") { inS = true; continue; }
-    if (c === '"') { inD = true; continue; }
-    if (c === "`") { inB = true; continue; }
-    if (c === ">") {
-      let start = i;
-      while (start > 0) {
-        const p = code[start - 1];
-        if (p === "&" || /[0-9]/.test(p)) start--;
-        else break;
-      }
-      const body = code.slice(0, start).replace(/\s+$/, "");
-      if (body === "") {
-        return null;
-      }
-      return { body, redirect: code.slice(start).replace(/\s+$/, "") };
-    }
+  const i = maskNonTopLevel(code).indexOf(">");
+  if (i === -1) {
+    return null;
   }
-  return null;
+  let start = i;
+  while (start > 0) {
+    const p = code[start - 1];
+    if (p === "&" || /[0-9]/.test(p)) start--;
+    else break;
+  }
+  const body = code.slice(0, start).replace(/\s+$/, "");
+  if (body === "") {
+    return null;
+  }
+  return { body, redirect: code.slice(start).replace(/\s+$/, "") };
 }
 
 function splitTail(

@@ -207,12 +207,22 @@ export function activate(context: vscode.ExtensionContext) {
     );
   };
 
-  let debounce: NodeJS.Timeout | undefined;
+  // One debounce timer per document, so editing one open crontab does not cancel
+  // a pending re-validation of another.
+  const debounces = new Map<string, NodeJS.Timeout>();
   const scheduleDiagnostics = (document: vscode.TextDocument) => {
-    if (debounce) {
-      clearTimeout(debounce);
+    const key = document.uri.toString();
+    const pending = debounces.get(key);
+    if (pending) {
+      clearTimeout(pending);
     }
-    debounce = setTimeout(() => runDiagnostics(document), 300);
+    debounces.set(
+      key,
+      setTimeout(() => {
+        debounces.delete(key);
+        runDiagnostics(document);
+      }, 300)
+    );
   };
 
   context.subscriptions.push(
@@ -221,9 +231,15 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.workspace.onDidChangeTextDocument((e) =>
       scheduleDiagnostics(e.document)
     ),
-    vscode.workspace.onDidCloseTextDocument((doc) =>
-      diagnostics.delete(doc.uri)
-    ),
+    vscode.workspace.onDidCloseTextDocument((doc) => {
+      const key = doc.uri.toString();
+      const pending = debounces.get(key);
+      if (pending) {
+        clearTimeout(pending);
+        debounces.delete(key);
+      }
+      diagnostics.delete(doc.uri);
+    }),
     // Re-validate open crontab files when the configuration changes (e.g. the
     // user switches locale), so hints update without editing the file.
     vscode.workspace.onDidChangeConfiguration((e) => {

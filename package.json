@@ -30,10 +30,7 @@
   },
   "homepage": "https://github.com/e-u-shapovalov/crontab-formatter/blob/main/README.md",
   "main": "./out/src/extension.js",
-  "activationEvents": [
-    "onLanguage:crontab",
-    "onLanguage:cron"
-  ],
+  "activationEvents": [],
   "contributes": {
     "languages": [
       {

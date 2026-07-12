@@ -29,7 +29,7 @@
   "config.preserveIndentation.desc": "Keep each line's existing leading spaces. Off (default) aligns every column from the left edge.",
   "config.minSpacesBetweenColumns.desc": "How many spaces to leave between aligned columns. Minimum `1`; default `2`.",
   "config.formatMacros.desc": "Also align macro lines (`@reboot`, `@daily`, `@hourly`, …) into the same columns as regular schedules.",
-  "config.validateOnSave.desc": "On save, run soft diagnostics (out-of-range fields, `*/0`, reversed ranges, unknown macros, missing user, relative paths, missing redirect). These are hints/warnings only — they never block formatting.",
+  "config.validateOnSave.desc": "On save, run soft diagnostics (out-of-range fields, `*/0`, reversed ranges, unknown macros, missing user, missing redirect). These are hints/warnings only — they never block formatting.",
   "config.explainHover.desc": "When you hover over a schedule, show a plain-language description of when it runs (powered by cronstrue).",
 
   "config.locale.desc": "Language for this extension's own messages, hints and hover explanations.\n\n- `ru` — Russian (default).\n- `en` — English.\n- `auto` — follow the VS Code display language.\n\nNote: the **settings descriptions** on this page follow the VS Code display language, not this option.",

@@ -32,7 +32,7 @@ export function fieldName(locale: Locale, id: string): string {
 
 type Msg = (...a: any[]) => string;
 
-const MESSAGES: Record<Locale, Record<string, Msg>> = {
+export const MESSAGES: Record<Locale, Record<string, Msg>> = {
   ru: {
     "few-fields": (n: number) =>
       `Слишком мало или невалидные cron-поля (ожидается ${n} полей расписания)`,

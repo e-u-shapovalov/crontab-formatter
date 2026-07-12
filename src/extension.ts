@@ -253,8 +253,10 @@ export function activate(context: vscode.ExtensionContext) {
       }
     })
   );
-  if (vscode.window.activeTextEditor) {
-    runDiagnostics(vscode.window.activeTextEditor.document);
+  for (const doc of vscode.workspace.textDocuments) {
+    if (isCrontab(doc)) {
+      runDiagnostics(doc);
+    }
   }
 
   // --- Commands ---

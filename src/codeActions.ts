@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
 import { FormatterSettings, Locale } from "./types";
 import { parseDocument, resolveFormat, splitLeadingTokens } from "./parser";
+import { hasTopLevelRedirect, hasTopLevelStderrRedirect } from "./formatter";
 import { t } from "./i18n";
 
 /**
@@ -65,8 +66,8 @@ export class CrontabCodeActionProvider implements vscode.CodeActionProvider {
     }
 
     if (command !== undefined && command.trim() !== "") {
-      const hasRedirect = command.includes(">");
-      const hasStderr = /2>|&>|>&/.test(command);
+      const hasRedirect = hasTopLevelRedirect(command);
+      const hasStderr = hasTopLevelStderrRedirect(command);
 
       if (!hasRedirect) {
         actions.push(

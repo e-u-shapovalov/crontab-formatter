@@ -1,7 +1,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { formatDocument } from "../src/formatter";
+import {
+  formatDocument,
+  hasTopLevelRedirect,
+  hasTopLevelStderrRedirect,
+} from "../src/formatter";
 import { DEFAULT_SETTINGS, FormatterSettings } from "../src/types";
 
 function s(overrides: Partial<FormatterSettings> = {}): FormatterSettings {
@@ -402,4 +406,20 @@ test("alignRedirects still aligns a real redirect after a $() body", () => {
   assert.ok(c0 > 0 && c0 === c1, out);
   assert.ok(out.includes("echo $(date)"), out);
   assert.ok(out.includes("/bin/b $(id)"), out);
+});
+
+// 25. redirect-detection helpers used by the code-action provider are
+// subshell/quote aware (a > hidden inside $() or quotes is not a redirect)
+test("hasTopLevelRedirect ignores > inside quotes and $()", () => {
+  assert.equal(hasTopLevelRedirect("cmd > /log"), true);
+  assert.equal(hasTopLevelRedirect("cmd 2>&1"), true);
+  assert.equal(hasTopLevelRedirect('echo "a > b"'), false);
+  assert.equal(hasTopLevelRedirect("echo $(date > /tmp/x)"), false);
+});
+
+test("hasTopLevelStderrRedirect ignores stderr redirects inside $()", () => {
+  assert.equal(hasTopLevelStderrRedirect("cmd > /log 2>&1"), true);
+  assert.equal(hasTopLevelStderrRedirect("cmd &>/log"), true);
+  assert.equal(hasTopLevelStderrRedirect("echo $(x 2>&1)"), false);
+  assert.equal(hasTopLevelStderrRedirect("cmd > /log"), false);
 });

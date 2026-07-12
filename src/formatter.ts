@@ -111,6 +111,18 @@ export function detectRedirect(
   return { body, redirect: code.slice(start).replace(/\s+$/, "") };
 }
 
+/** True if the command has an output redirection at the top level (outside
+ * quotes/backticks/`$(...)`). Shared with the code-action provider so quick
+ * fixes agree with the validator on what counts as a redirect. */
+export function hasTopLevelRedirect(command: string): boolean {
+  return maskNonTopLevel(command).includes(">");
+}
+
+/** True if stderr is redirected at the top level (`2>`, `&>`, `>&`). */
+export function hasTopLevelStderrRedirect(command: string): boolean {
+  return /2>|&>|>&/.test(maskNonTopLevel(command));
+}
+
 function splitTail(
   command: string,
   settings: FormatterSettings

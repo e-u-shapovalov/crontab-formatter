@@ -20,12 +20,13 @@ const SCHEDULE_MACROS: { expr: string; macro: string }[] = [
 
 function scriptBaseName(command: string): string {
   const first = splitLeadingTokens(command, 1).tokens[0] ?? "";
-  const base = first.split("/").pop() ?? "";
+  // The executable is only the leading path-like run; stop at the first shell
+  // metacharacter (`&`, `;`, `|`, `$`, quotes, …) so nothing unsafe can reach
+  // the generated redirect. Falls back to "cron" when there is no clean name.
+  const path = (first.match(/^[A-Za-z0-9._/-]+/) ?? [""])[0];
+  const base = path.split("/").pop() ?? "";
   const name = base.replace(/\.[^.]+$/, "");
-  // The result is interpolated into a shell redirect, so keep only characters
-  // that are safe there; anything else (`;`, `&`, `$`, quotes, …) is dropped.
-  const safe = name.replace(/[^A-Za-z0-9._-]/g, "");
-  return safe || "cron";
+  return name || "cron";
 }
 
 export class CrontabCodeActionProvider implements vscode.CodeActionProvider {

@@ -15,6 +15,19 @@ import { fieldSyntaxOk, getFieldMetas } from "./fields";
 const ENV_RE = /^[A-Za-z_][A-Za-z0-9_]*\s*=/;
 const USERNAME_RE = /^[a-z_][-a-z0-9_]*\$?$/i;
 
+// Common command names that also parse as usernames. Used only to bias the
+// content-based user/system heuristic towards *user* mode when the token after
+// the schedule is really a command, not a system user. Names that are plausible
+// system users (root, www-data, mysql, postgres, nobody, …) are deliberately
+// absent — those stay ambiguous and are resolved by the surrounding heuristic.
+const COMMON_COMMANDS = new Set([
+  "sh", "bash", "zsh", "dash", "python", "python2", "python3", "perl", "ruby",
+  "node", "php", "curl", "wget", "echo", "printf", "date", "find", "sync",
+  "sleep", "cat", "cp", "mv", "rm", "mkdir", "touch", "tar", "gzip", "rsync",
+  "ssh", "scp", "git", "make", "npm", "npx", "yarn", "pnpm", "test", "flock",
+  "logger", "sed", "awk", "grep", "true", "false",
+]);
+
 export function isUsername(token: string): boolean {
   return token.length <= 32 && USERNAME_RE.test(token);
 }
@@ -88,10 +101,16 @@ function autoDetectUser(
     }
     total++;
     const peek = splitLeadingTokens(rest, 1);
+    const candidate = peek.tokens[0] ?? "";
     if (
       peek.tokens.length === 1 &&
-      isUsername(peek.tokens[0]) &&
-      peek.rest.trim() !== ""
+      isUsername(candidate) &&
+      peek.rest.trim() !== "" &&
+      // A real system-user token is followed by a command, not by a flag,
+      // redirect or pipe (those mean the "user" is actually the command); and
+      // it is not an obvious command name.
+      !/^[-<>|]/.test(peek.rest.replace(/^\s+/, "")) &&
+      !COMMON_COMMANDS.has(candidate.toLowerCase())
     ) {
       systemish++;
     }

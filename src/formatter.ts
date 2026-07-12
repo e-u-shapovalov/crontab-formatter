@@ -20,30 +20,36 @@ const HEADER_LABEL: Record<string, string> = {
 };
 
 /**
- * Blank out every character that lives inside single/double quotes, backticks,
- * a `$(...)` command substitution or a `<(...)`/`>(...)` process substitution,
- * preserving length. A backslash escapes the next character (except inside
- * single quotes, where nothing is special), so `\"`, `\>` and `\#` are treated
- * as literals rather than opening a quote or a redirect/comment. Callers scan
- * the mask for a *top-level* `>` or `#` and slice the original string at the
- * same index, so a redirect or `#` hidden inside a command is never split off.
+ * Blank out every character that is not at the shell top level, preserving
+ * length. Callers scan the mask for a *top-level* `>` or `#` and slice the
+ * original string at the same index, so a redirect or `#` hidden inside a
+ * command is never split off.
+ *
+ * A stack of nesting contexts is tracked so that quotes nested inside a
+ * substitution (e.g. `"$(printf "x")"`) are handled correctly — the inner `"`
+ * opens its own context instead of closing the outer one. Handled: single
+ * quotes (fully literal), double quotes, backticks, `$(…)` command
+ * substitution, `<(…)`/`>(…)` process substitution and bare `(…)` subshell
+ * groups. A backslash escapes the next character everywhere except inside
+ * single quotes, so `\"`, `\>`, `\#` and `\$` are treated as literals.
  */
 export function maskNonTopLevel(s: string): string {
   let out = "";
-  let inS = false;
-  let inD = false;
-  let inB = false;
-  let depth = 0; // $( / <( / >( nesting
+  // Each frame is a nesting context; anything with a non-empty stack is masked.
+  // "subst" covers $( / <( / >( / bare `(` and tracks its own paren depth.
+  const stack: { type: "single" | "double" | "backtick" | "subst"; depth: number }[] = [];
   for (let i = 0; i < s.length; i++) {
     const c = s[i];
-    // Single quotes are fully literal — no escaping, no nesting.
-    if (inS) {
+    const top = stack.length > 0 ? stack[stack.length - 1] : undefined;
+
+    // Single quotes: fully literal, no escaping, until the closing quote.
+    if (top && top.type === "single") {
       out += " ";
-      if (c === "'") inS = false;
+      if (c === "'") stack.pop();
       continue;
     }
-    // A backslash escapes the following character everywhere else; mask both so
-    // the escaped char can never act as a delimiter.
+
+    // A backslash escapes the next character in every other context.
     if (c === "\\") {
       out += " ";
       if (i + 1 < s.length) {
@@ -52,32 +58,48 @@ export function maskNonTopLevel(s: string): string {
       }
       continue;
     }
-    if (inD) {
+
+    // Backticks: masked verbatim until the closing backtick (kept simple — no
+    // substitution parsing inside).
+    if (top && top.type === "backtick") {
       out += " ";
-      if (c === '"') inD = false;
+      if (c === "`") stack.pop();
       continue;
     }
-    if (inB) {
-      out += " ";
-      if (c === "`") inB = false;
-      continue;
-    }
-    if (c === "'") { inS = true; out += " "; continue; }
-    if (c === '"') { inD = true; out += " "; continue; }
-    if (c === "`") { inB = true; out += " "; continue; }
-    // Command / process substitution: `$(`, `<(`, `>(`.
+
+    // A command / process substitution can open at the top level and inside a
+    // double quote or another substitution.
     if ((c === "$" || c === "<" || c === ">") && s[i + 1] === "(") {
-      depth++;
-      out += "  "; // blank both the leading char and `(`
+      stack.push({ type: "subst", depth: 0 });
+      out += "  "; // blank the marker and `(`
       i++;
       continue;
     }
-    if (depth > 0) {
-      if (c === "(") depth++;
-      else if (c === ")") depth--;
+
+    if (top && top.type === "subst") {
+      if (c === "(") top.depth++;
+      else if (c === ")") {
+        if (top.depth === 0) stack.pop();
+        else top.depth--;
+      } else if (c === "'") stack.push({ type: "single", depth: 0 });
+      else if (c === '"') stack.push({ type: "double", depth: 0 });
+      else if (c === "`") stack.push({ type: "backtick", depth: 0 });
       out += " ";
       continue;
     }
+
+    if (top && top.type === "double") {
+      if (c === '"') stack.pop();
+      else if (c === "`") stack.push({ type: "backtick", depth: 0 });
+      out += " ";
+      continue;
+    }
+
+    // Top level (stack empty).
+    if (c === "'") { stack.push({ type: "single", depth: 0 }); out += " "; continue; }
+    if (c === '"') { stack.push({ type: "double", depth: 0 }); out += " "; continue; }
+    if (c === "`") { stack.push({ type: "backtick", depth: 0 }); out += " "; continue; }
+    if (c === "(") { stack.push({ type: "subst", depth: 0 }); out += " "; continue; }
     out += c;
   }
   return out;
@@ -113,7 +135,12 @@ export function detectTrailingComment(
 export function detectRedirect(
   code: string
 ): { body: string; redirect: string } | null {
-  const i = maskNonTopLevel(code).indexOf(">");
+  // A `>` inside a trailing shell comment is not a redirect — restrict the
+  // search to the code before any top-level `#`. The comment itself stays with
+  // whichever slice (body or redirect) so the command is never modified.
+  const tc = detectTrailingComment(code);
+  const limit = tc ? code.length - tc.comment.length : code.length;
+  const i = maskNonTopLevel(code).slice(0, limit).indexOf(">");
   if (i === -1) {
     return null;
   }
@@ -156,7 +183,9 @@ export interface RedirectState {
  */
 export function analyzeRedirects(command: string): RedirectState {
   const code = maskNonTopLevel(command);
-  const badMatch = code.match(/>\s*\d+\s*&\s*\d*/);
+  // A typo like `>1&2` (fd/`&` glued to `>` with no spaces). `> 2 &` (redirect
+  // to a file then background) is valid and must NOT match.
+  const badMatch = code.match(/>\d+&\d*/);
   // sinks: false = console (cron mail), true = a file/sink
   let fd1 = false;
   let fd2 = false;
@@ -176,15 +205,28 @@ export function analyzeRedirects(command: string): RedirectState {
       else if (from === 2) fd2 = src;
     } else if (m[4] !== undefined || m[5] !== undefined) {
       // `<>` read/write or `<` input redirect — not an stdout/stderr sink.
+    } else if (m[0][0] === "&") {
+      // `&>file`, `&>>file` — both streams to a file.
+      fd1 = true;
+      fd2 = true;
+    } else if (m[0] === ">&") {
+      // `>&file` (no fd after `&`) is an alias for `1>file` — stdout only.
+      fd1 = true;
     } else if (m[0].includes(">")) {
-      if (m[0].includes("&")) {
-        // `&>`, `&>>`, `>&file` — both streams to a file.
+      // `>`, `>>`, `2>`, `2>>`, `>|` — a plain file redirect on fd (m3 || 1),
+      // optionally followed by an `&N` duplication (`2>>&1`).
+      const fd = !m[3] ? 1 : parseInt(m[3], 10);
+      const dup = code.slice(re.lastIndex).match(/^&(\d+)/);
+      if (dup) {
+        const to = parseInt(dup[1], 10);
+        const src: boolean = to === 1 ? fd1 : to === 2 ? fd2 : false;
+        if (fd === 1) fd1 = src;
+        else if (fd === 2) fd2 = src;
+        re.lastIndex += dup[0].length;
+      } else if (fd === 1) {
         fd1 = true;
+      } else if (fd === 2) {
         fd2 = true;
-      } else {
-        const fd = !m[3] ? 1 : parseInt(m[3], 10);
-        if (fd === 1) fd1 = true;
-        else if (fd === 2) fd2 = true;
       }
     }
   }

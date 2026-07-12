@@ -460,3 +460,49 @@ test("analyzeRedirects handles escaping and process substitution", () => {
   // > inside a process substitution is not the job's redirect
   assert.equal(analyzeRedirects("diff <(cmd >f) <(cmd2)").stdout, false);
 });
+
+// 28. the scanner masks nested quotes inside a substitution, an escaped-$ +
+// bare subshell, and bare subshell groups (the round-4 critical class)
+test("analyzeRedirects masks nested quotes / subshell content", () => {
+  // a > inside "$(printf "…")" is the subshell's, not the job's
+  assert.equal(analyzeRedirects('mail -s "$(printf "a > b")" x').stdout, false);
+  // escaped-$ then a bare subshell group
+  assert.equal(analyzeRedirects("cmd \\$(date > /x)").stdout, false);
+  // a bare subshell group masks its content; the outer > is the job's redirect
+  assert.equal(analyzeRedirects("(cmd > inner) > log").stdout, true);
+});
+
+test("formatDocument preserves bytes of nested-quote / subshell commands", () => {
+  const settings = s({ mode: "user", alignRedirects: true });
+  for (const cmd of ['mail -s "$(printf "a > b")" x', "cmd \\$(date > /x)"]) {
+    const out = formatDocument("0 0 * * * " + cmd, settings);
+    assert.equal(out, "0  0  *  *  *  " + cmd, cmd);
+    assert.equal(formatDocument(out, settings), out, "idempotent " + cmd);
+  }
+});
+
+test("alignRedirects does not split a > inside a trailing comment", () => {
+  const cmd = "cmd # x > y";
+  const out = formatDocument(
+    "0 0 * * * " + cmd,
+    s({ mode: "user", alignRedirects: true })
+  );
+  assert.equal(out, "0  0  *  *  *  " + cmd);
+});
+
+// 29. fd analysis distinguishes >&file (stdout only) from &>file (both) and
+// handles 2>>&1; the bad-redirect hint no longer fires on a valid `> 2 &`
+test("analyzeRedirects distinguishes >&file, &>file and 2>>&1", () => {
+  const st = (c: string) => {
+    const r = analyzeRedirects(c);
+    return [r.stdout, r.stderr];
+  };
+  assert.deepEqual(st("cmd >&file"), [true, false]);
+  assert.deepEqual(st("cmd &>file"), [true, true]);
+  assert.deepEqual(st("cmd 2>>&1"), [false, false]);
+});
+
+test("bad-redirect flags >1&2 but not a valid > 2 &", () => {
+  assert.notEqual(analyzeRedirects("cmd >1&2").bad, null);
+  assert.equal(analyzeRedirects("cmd > 2 &").bad, null);
+});

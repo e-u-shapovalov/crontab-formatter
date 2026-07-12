@@ -25,7 +25,7 @@
   "config.alignComments.desc": "Pull a safe trailing comment (a `#` that is **outside** quotes) into its own aligned column. Comments that are part of the command are left untouched.",
   "config.alignRedirects.desc": "Line up the redirection tail (`>`, `>>`, `2>&1`) in its own column so you can see at a glance where each job sends its output.",
   "config.alignEnvEquals.desc": "Align environment assignments such as `PATH=…` / `MAILTO=…` on the `=` sign.",
-  "config.insertHeader.desc": "Insert a reminder line `# min hour day month weekday command` at the top of the file.",
+  "config.insertHeader.desc": "Insert a reminder line `# min hour day month weekday command` at the top of the file. Extra columns (seconds, year, user) are added when their settings are enabled.",
   "config.preserveIndentation.desc": "Keep each line's existing leading spaces. Off (default) aligns every column from the left edge.",
   "config.minSpacesBetweenColumns.desc": "How many spaces to leave between aligned columns. Minimum `1`; default `2`.",
   "config.formatMacros.desc": "Also align macro lines (`@reboot`, `@daily`, `@hourly`, …) among themselves. Macros form their own column, separate from regular cron schedules.",

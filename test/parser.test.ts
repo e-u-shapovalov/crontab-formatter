@@ -31,3 +31,23 @@ test("etc_crontab / crontab.system aliases match as components, not substrings",
   assert.equal(detectsSystem("/home/etc_crontab_notes"), false);
   assert.equal(detectsSystem("/home/my-crontab.system.bak"), false);
 });
+
+// The content heuristic must not read a command-looking first token as a system
+// user on an ordinary personal crontab (no system filename).
+test("content heuristic biases to user mode for command-looking first tokens", () => {
+  const hasUser = (t: string) => resolveFormat(t, "", DEFAULT_SETTINGS).hasUser;
+  // flags / command names after the schedule => user crontab, not system
+  assert.equal(
+    hasUser('0 0 * * * mysql -e "b"\n0 0 * * * postgres pg_dump db'),
+    false
+  );
+  assert.equal(
+    hasUser("0 3 * * * date >> /log\n30 4 * * * find /tmp -delete\n0 5 * * * sync"),
+    false
+  );
+  // a genuine system layout (real users + commands) is still detected
+  assert.equal(
+    hasUser("0 5 * * * root /bin/backup.sh\n30 2 * * * www-data /usr/bin/cleanup"),
+    true
+  );
+});

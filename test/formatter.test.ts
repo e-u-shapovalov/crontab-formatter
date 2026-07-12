@@ -1,11 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import {
-  formatDocument,
-  hasTopLevelRedirect,
-  hasTopLevelStderrRedirect,
-} from "../src/formatter";
+import { formatDocument, analyzeRedirects } from "../src/formatter";
 import { DEFAULT_SETTINGS, FormatterSettings } from "../src/types";
 
 function s(overrides: Partial<FormatterSettings> = {}): FormatterSettings {
@@ -408,20 +404,26 @@ test("alignRedirects still aligns a real redirect after a $() body", () => {
   assert.ok(out.includes("/bin/b $(id)"), out);
 });
 
-// 25. redirect-detection helpers used by the code-action provider are
-// subshell/quote aware (a > hidden inside $() or quotes is not a redirect)
-test("hasTopLevelRedirect ignores > inside quotes and $()", () => {
-  assert.equal(hasTopLevelRedirect("cmd > /log"), true);
-  assert.equal(hasTopLevelRedirect("cmd 2>&1"), true);
-  assert.equal(hasTopLevelRedirect('echo "a > b"'), false);
-  assert.equal(hasTopLevelRedirect("echo $(date > /tmp/x)"), false);
+// 25. the redirect analyzer (shared by validator + code actions) ignores a >
+// hidden inside $()/quotes and models fd targets and order
+test("analyzeRedirects ignores > inside quotes and $()", () => {
+  assert.equal(analyzeRedirects("cmd > /log").stdout, true);
+  assert.equal(analyzeRedirects('echo "a > b"').stdout, false);
+  assert.equal(analyzeRedirects("echo $(date > /tmp/x)").stdout, false);
 });
 
-test("hasTopLevelStderrRedirect ignores stderr redirects inside $()", () => {
-  assert.equal(hasTopLevelStderrRedirect("cmd > /log 2>&1"), true);
-  assert.equal(hasTopLevelStderrRedirect("cmd &>/log"), true);
-  assert.equal(hasTopLevelStderrRedirect("echo $(x 2>&1)"), false);
-  assert.equal(hasTopLevelStderrRedirect("cmd > /log"), false);
+test("analyzeRedirects models fd targets, duplication and order", () => {
+  const st = (c: string) => {
+    const r = analyzeRedirects(c);
+    return [r.stdout, r.stderr];
+  };
+  assert.deepEqual(st("cmd 2>&1"), [false, false]); // stdout still on console
+  assert.deepEqual(st("cmd >/log"), [true, false]);
+  assert.deepEqual(st("cmd >/log 2>&1"), [true, true]);
+  assert.deepEqual(st("cmd 2>&1 >/dev/null"), [true, false]); // order matters
+  assert.deepEqual(st("cmd 2>/tmp/err"), [false, true]);
+  assert.deepEqual(st("cmd &>/log"), [true, true]);
+  assert.deepEqual(st("cmd 1>&2"), [false, false]);
 });
 
 // 26. alignRedirects must never split a fd/operator fused to the command word,
@@ -450,11 +452,11 @@ test("alignRedirects still splits a standalone fd redirect", () => {
 });
 
 // 27. the shared scanner handles backslash escaping and process substitution
-test("maskNonTopLevel-based helpers handle escaping and process substitution", () => {
+test("analyzeRedirects handles escaping and process substitution", () => {
   // an escaped opening quote must not hide a real top-level redirect
-  assert.equal(hasTopLevelRedirect('printf \\"hi\\" > /log'), true);
+  assert.equal(analyzeRedirects('printf \\"hi\\" > /log').stdout, true);
   // an escaped > is a literal, not a redirect
-  assert.equal(hasTopLevelRedirect("echo a \\> b"), false);
+  assert.equal(analyzeRedirects("echo a \\> b").stdout, false);
   // > inside a process substitution is not the job's redirect
-  assert.equal(hasTopLevelRedirect("diff <(cmd >f) <(cmd2)"), false);
+  assert.equal(analyzeRedirects("diff <(cmd >f) <(cmd2)").stdout, false);
 });

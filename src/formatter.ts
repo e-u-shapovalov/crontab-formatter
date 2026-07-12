@@ -136,16 +136,59 @@ export function detectRedirect(
   return { body, redirect: code.slice(start).replace(/\s+$/, "") };
 }
 
-/** True if the command has an output redirection at the top level (outside
- * quotes/backticks/`$(...)`). Shared with the code-action provider so quick
- * fixes agree with the validator on what counts as a redirect. */
-export function hasTopLevelRedirect(command: string): boolean {
-  return maskNonTopLevel(command).includes(">");
+export interface RedirectState {
+  /** True when fd 1 (stdout) ends up at a file/sink rather than the console. */
+  stdout: boolean;
+  /** True when fd 2 (stderr) ends up at a file/sink rather than the console. */
+  stderr: boolean;
+  /** A malformed `>N&M`-style redirect, if any (for a `bad-redirect` hint). */
+  bad: string | null;
 }
 
-/** True if stderr is redirected at the top level (`2>`, `&>`, `>&`). */
-export function hasTopLevelStderrRedirect(command: string): boolean {
-  return /2>|&>|>&/.test(maskNonTopLevel(command));
+/**
+ * Simulate where stdout (fd 1) and stderr (fd 2) point after the top-level
+ * output redirections in a command, left to right. This models order and
+ * duplication (`2>&1`, `1>&2`), so `cmd 2>&1` reports stdout still on the
+ * console, while `cmd >f 2>&1` reports both captured and `cmd 2>&1 >f` reports
+ * stderr still on the console. Shared by the validator and the code-action
+ * provider so hints and quick fixes agree. Redirects inside quotes/backticks/
+ * substitutions are ignored via `maskNonTopLevel`.
+ */
+export function analyzeRedirects(command: string): RedirectState {
+  const code = maskNonTopLevel(command);
+  const badMatch = code.match(/>\s*\d+\s*&\s*\d*/);
+  // sinks: false = console (cron mail), true = a file/sink
+  let fd1 = false;
+  let fd2 = false;
+  const re = /(\d*)>&(\d+)|&>>?|>&|(\d*)>>?\|?|(\d*)<>|(\d*)</g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(code)) !== null) {
+    if (m[0] === "") {
+      re.lastIndex++; // guard against a zero-width match
+      continue;
+    }
+    if (m[2] !== undefined) {
+      // duplication: (m1 || 1)>&(m2)
+      const from = m[1] === "" ? 1 : parseInt(m[1], 10);
+      const to = parseInt(m[2], 10);
+      const src: boolean = to === 1 ? fd1 : to === 2 ? fd2 : false;
+      if (from === 1) fd1 = src;
+      else if (from === 2) fd2 = src;
+    } else if (m[4] !== undefined || m[5] !== undefined) {
+      // `<>` read/write or `<` input redirect — not an stdout/stderr sink.
+    } else if (m[0].includes(">")) {
+      if (m[0].includes("&")) {
+        // `&>`, `&>>`, `>&file` — both streams to a file.
+        fd1 = true;
+        fd2 = true;
+      } else {
+        const fd = !m[3] ? 1 : parseInt(m[3], 10);
+        if (fd === 1) fd1 = true;
+        else if (fd === 2) fd2 = true;
+      }
+    }
+  }
+  return { stdout: fd1, stderr: fd2, bad: badMatch ? badMatch[0].trim() : null };
 }
 
 function splitTail(

@@ -11,24 +11,8 @@ import {
   isUsername,
 } from "./parser";
 import { getFieldMetas, analyzeField } from "./fields";
-import { maskNonTopLevel, detectTrailingComment } from "./formatter";
+import { detectTrailingComment, analyzeRedirects } from "./formatter";
 import { fieldName, t } from "./i18n";
-
-interface RedirectInfo {
-  hasOut: boolean;
-  hasErr: boolean;
-  bad: string | null;
-}
-
-function analyzeRedirects(command: string): RedirectInfo {
-  const code = maskNonTopLevel(command);
-  const badMatch = code.match(/>\s*\d+\s*&\s*\d*/);
-  return {
-    hasOut: code.includes(">"),
-    hasErr: /2>|&>|>&/.test(code),
-    bad: badMatch ? badMatch[0].trim() : null,
-  };
-}
 
 export function validateDocument(
   text: string,
@@ -64,9 +48,9 @@ export function validateDocument(
       if (r.bad) {
         push(t(locale, "bad-redirect", r.bad), "warning", "bad-redirect");
       }
-      if (!r.hasOut) {
+      if (!r.stdout) {
         push(t(locale, "no-redirect"), "info", "no-redirect");
-      } else if (!r.hasErr) {
+      } else if (!r.stderr) {
         push(t(locale, "stderr-not-redirected"), "info", "stderr-not-redirected");
       }
     };

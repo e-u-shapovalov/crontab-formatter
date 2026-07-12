@@ -1,11 +1,7 @@
 import * as vscode from "vscode";
 import { FormatterSettings, Locale } from "./types";
 import { parseDocument, resolveFormat, splitLeadingTokens } from "./parser";
-import {
-  hasTopLevelRedirect,
-  hasTopLevelStderrRedirect,
-  detectTrailingComment,
-} from "./formatter";
+import { analyzeRedirects, detectTrailingComment } from "./formatter";
 import { t } from "./i18n";
 
 /**
@@ -87,8 +83,7 @@ export class CrontabCodeActionProvider implements vscode.CodeActionProvider {
         : eolPos;
 
       if (code.trim() !== "") {
-        const hasRedirect = hasTopLevelRedirect(code);
-        const hasStderr = hasTopLevelStderrRedirect(code);
+        const { stdout: hasRedirect, stderr: hasStderr } = analyzeRedirects(code);
 
         if (!hasRedirect) {
           actions.push(

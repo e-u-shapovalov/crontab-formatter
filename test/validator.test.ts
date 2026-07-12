@@ -76,6 +76,17 @@ test("a clean redirect before a trailing comment is recognised as complete", () 
   assert.ok(!c.includes("stderr-not-redirected"), JSON.stringify(c));
 });
 
+test("2>&1 alone still leaves stdout on the console", () => {
+  const c = codes("* * * * * cmd 2>&1");
+  assert.ok(c.includes("no-redirect"), JSON.stringify(c));
+});
+
+test("2>&1 before a stdout redirect leaves stderr on the console", () => {
+  const c = codes("* * * * * cmd 2>&1 >/dev/null");
+  assert.ok(c.includes("stderr-not-redirected"), JSON.stringify(c));
+  assert.ok(!c.includes("no-redirect"), JSON.stringify(c));
+});
+
 test("system mode without a user is flagged", () => {
   const c = codes("0 0 * * * /bin/x >/dev/null 2>&1", s({ mode: "system" }));
   assert.ok(c.includes("missing-user"));

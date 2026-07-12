@@ -83,7 +83,7 @@ Formatting changes the spacing between columns. It does not rewrite the schedule
 - Commands remain raw text during normal formatting, so quotes, pipes, redirects, `&&`, `||`, `%`, `$()`, backticks, inline `#`, and internal spaces are not tokenized or normalized.
 - Comments, blank lines, environment assignments, and supported `@macros` are handled separately instead of being mistaken for schedules.
 - Diagnostics point out suspicious fields and redirections without blocking formatting or claiming to execute the schedule.
-- Hover text translates a supported cron expression into English or Russian using [`cronstrue`](https://github.com/bradymholt/cRonstrue).
+- Hover text translates a supported cron expression into English or Russian using [`cronstrue`](https://github.com/bradymholt/cronstrue).
 - Built-in TextMate grammar highlights schedules, commands, environment variables, comments, shell variables, and redirect targets. Exact colors come from the active VS Code theme.
 
 ## Features
@@ -314,4 +314,4 @@ Author: [Evgenii Shapovalov](https://github.com/e-u-shapovalov).
 
 Crontab Formatter is available under the [MIT License](LICENSE), copyright © 2026 Evgenii Shapovalov.
 
-Human-readable schedule explanations are powered by [`cronstrue`](https://github.com/bradymholt/cRonstrue), which is distributed under its own MIT license included in the extension package.
+Human-readable schedule explanations are powered by [`cronstrue`](https://github.com/bradymholt/cronstrue), which is distributed under its own MIT license included in the extension package.

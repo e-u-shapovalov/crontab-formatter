@@ -2,7 +2,7 @@
   "name": "crontab-formatter",
   "displayName": "Crontab Formatter",
   "description": "%ext.description%",
-  "version": "0.3.0",
+  "version": "1.0.0",
   "publisher": "EvgeniiShapovalov",
   "icon": "images/cronformat.png",
   "author": "EvgeniiShapovalov (https://github.com/e-u-shapovalov)",

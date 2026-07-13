@@ -6,6 +6,17 @@ All notable changes to the Crontab Formatter extension are documented in this fi
 
 ## English
 
+### 1.0.0
+
+First stable release, published to the Visual Studio Marketplace.
+
+- Hardened the shell scanner shared by formatting, diagnostics and quick fixes: quotes, backticks, `$()`/`<()` substitutions (including nested quotes and backslash escaping) and bare subshells are handled correctly, so column alignment never changes the bytes of a command.
+- Redirect diagnostics now model the stdout/stderr file descriptors (operator order, duplication, `>&file`, `2>&1`) instead of only looking for a `>`.
+- Localized the "explain schedule" and "convert to macro" quick-fix titles.
+- More accurate user/system auto-detection — ordinary commands such as `mysql -e …` or `date >> …` are no longer mistaken for a system user column.
+- Schedule explanations now include the year field when `crontabFormatter.yearField` is enabled.
+- Slimmed the packaged extension (only the `ru`/`en` `cronstrue` runtime is shipped).
+
 ### 0.3.0
 
 Initial public release.
@@ -19,6 +30,17 @@ Initial public release.
 - Bundled TextMate grammar for crontab syntax highlighting.
 
 ## Русский
+
+### 1.0.0
+
+Первый стабильный выпуск, опубликованный в Visual Studio Marketplace.
+
+- Усилен разбор команд, общий для форматирования, диагностики и быстрых исправлений: кавычки, бэктики, подстановки `$()`/`<()` (включая вложенные кавычки и экранирование обратным слэшем) и подоболочки обрабатываются корректно, поэтому выравнивание колонок никогда не меняет байты команды.
+- Диагностика перенаправлений теперь моделирует файловые дескрипторы stdout/stderr (порядок операторов, дублирование, `>&file`, `2>&1`), а не просто ищет `>`.
+- Локализованы названия быстрых исправлений «объяснить расписание» и «преобразовать в макрос».
+- Точнее автоопределение user/system — обычные команды вроде `mysql -e …` или `date >> …` больше не принимаются за системную колонку пользователя.
+- Расшифровка расписания теперь включает поле года, когда включён `crontabFormatter.yearField`.
+- Пакет расширения урезан (в поставке только рантайм `cronstrue` для `ru`/`en`).
 
 ### 0.3.0
 

@@ -6,36 +6,33 @@ Crontab Formatter is a VS Code extension for formatting cron and crontab files i
 
 It is intended for system administrators, developers, and anyone who reviews user crontabs, `/etc/crontab`, or files under `cron.d` in Visual Studio Code.
 
-## Download and install
+## Install
 
-The ready-to-use release is [Crontab Formatter v0.3.0](https://github.com/e-u-shapovalov/crontab-formatter/releases/tag/v0.3.0). It requires Visual Studio Code 1.75.0 or later.
+Crontab Formatter is published on the **Visual Studio Marketplace**. In VS Code, open **View → Extensions**, search for **Crontab Formatter** (publisher `EvgeniiShapovalov`), and click **Install**. It requires Visual Studio Code 1.75.0 or later.
 
-> [!IMPORTANT]
-> If you are a regular user, do not use Code → Download ZIP. Download the ready-to-use release package from GitHub Releases instead.
-
-Download [`crontab-formatter-0.3.0.vsix`](https://github.com/e-u-shapovalov/crontab-formatter/releases/download/v0.3.0/crontab-formatter-0.3.0.vsix). A VSIX file is a VS Code extension package: install it as a file and do not extract it.
-
-If you are not familiar with GitHub:
-
-1. Open the [Releases page](https://github.com/e-u-shapovalov/crontab-formatter/releases).
-2. Open the newest release. The confirmed current release is `v0.3.0`.
-3. Expand **Assets** if GitHub has collapsed the list.
-4. Download the file ending in `.vsix`. Do not choose **Source code (zip)** or **Source code (tar.gz)**.
-5. In VS Code, open **View → Extensions**.
-6. Open the Extensions view `…` menu and select **Install from VSIX…**.
-7. Select the downloaded file and reload VS Code if prompted.
-
-You can also install the package from a terminal if the VS Code `code` command is available:
+From a terminal:
 
 ```shell
-code --install-extension /path/to/crontab-formatter-0.3.0.vsix
+code --install-extension EvgeniiShapovalov.crontab-formatter
 ```
 
-The confirmed distribution channel for version 0.3.0 is GitHub Releases. If VS Code extension search does not show Crontab Formatter, install the VSIX package using the steps above.
+### Install from a VSIX file (offline / alternative)
 
-### If you downloaded Source code by mistake
+A packaged `.vsix` is also attached to each [GitHub Release](https://github.com/e-u-shapovalov/crontab-formatter/releases).
 
-The source archive is for development and is not a ready-to-install extension. Delete or set aside that archive, return to [GitHub Releases](https://github.com/e-u-shapovalov/crontab-formatter/releases), and download `crontab-formatter-0.3.0.vsix` from **Assets**. Developers who intentionally want the source can follow [Building from source](#building-from-source).
+> [!IMPORTANT]
+> Do not use Code → Download ZIP, and do not download the **Source code (zip)** or **Source code (tar.gz)** assets — those are the source, not an installable extension.
+
+1. Open the latest entry on the [Releases page](https://github.com/e-u-shapovalov/crontab-formatter/releases).
+2. Under **Assets**, download the file ending in `.vsix`.
+3. In VS Code, open **View → Extensions**, open the view's `…` menu, and select **Install from VSIX…**.
+4. Select the downloaded file and reload VS Code if prompted.
+
+Or from a terminal:
+
+```shell
+code --install-extension /path/to/crontab-formatter-1.0.0.vsix
+```
 
 ## Quick start
 
@@ -167,7 +164,7 @@ Open the Extensions view, select the gear next to Crontab Formatter, and choose 
 | `crontabFormatter.alignComments` | `false` | Align a trailing `#` comment found outside quotes. |
 | `crontabFormatter.alignRedirects` | `false` | Align the first unquoted `>` redirect and its tail. |
 | `crontabFormatter.alignEnvEquals` | `false` | Align `=` in environment assignments. |
-| `crontabFormatter.insertHeader` | `false` | Insert a `# min hour day month weekday command` reminder. |
+| `crontabFormatter.insertHeader` | `false` | Insert a `# min hour day month weekday command` reminder (seconds/year/user columns are added when those settings are enabled). |
 | `crontabFormatter.preserveIndentation` | `false` | Keep leading indentation instead of aligning from the left edge. |
 | `crontabFormatter.minSpacesBetweenColumns` | `2` | Set the minimum spaces between aligned columns; minimum value is `1`. |
 | `crontabFormatter.formatMacros` | `true` | Align supported `@macro` lines. |
@@ -194,12 +191,10 @@ These examples explain the extension's redirect hints; they are not applied auto
 - Automatic user/system detection is heuristic. Ambiguous files, especially a single system-style line under an unusual filename, may need `crontabFormatter.mode` set explicitly.
 - `secondsField: auto` and `yearField: auto` are deliberately off. Enable either field explicitly when the file uses it.
 - Advanced scheduler dialects are not fully supported. In particular, enabling seconds/year fields does not add support for all Quartz operators.
-- The schedule explainer omits the year field when producing human-readable text.
 - Invalid or incomplete schedule lines are preserved instead of force-formatted.
-- In the published `v0.3.0` VSIX, `alignRedirects` and `alignComments` are off by default. Their splitter understands single quotes, double quotes, and backticks, but does not model nested shell syntax such as `$()`; review the diff when enabling these options for complex commands.
+- `alignRedirects` and `alignComments` are off by default. When enabled, the splitter understands quotes, backticks, `$()`/`<()` substitutions and backslash escaping, but you should still review the diff before committing unusually complex commands.
 - `insertHeader` adds a new comment line. When it is enabled, formatting a selection can format the entire document because the line count changes.
-- Diagnostics are a focused set of hints, not a complete crontab validator. Version 0.3.0 does not check whether command paths are absolute.
-- In the published `v0.3.0` VSIX, the titles of the “explain schedule” and “convert to macro” Code Actions remain in Russian even when the extension locale is English. Their behavior is unchanged.
+- Diagnostics are a focused set of hints, not a complete crontab validator; they do not, for example, check whether command paths are absolute.
 - Syntax highlighting is based on the standard five-field layout; optional seconds/year layouts may not receive the intended scopes for every token.
 
 Always review the formatted diff before installing a crontab on a production system.
@@ -230,15 +225,11 @@ Set Crontab Formatter as `editor.defaultFormatter` for the active language ID an
 
 They are informational advice. Disable `crontabFormatter.validateOnSave` if you do not want diagnostics, or keep it enabled and ignore the hints that do not apply to your cron environment.
 
-### Some quick-action titles are in Russian
-
-This is a known localization limitation in the published version 0.3.0 VSIX for two Code Actions. Other extension messages follow `crontabFormatter.locale`.
-
 ## FAQ
 
-### What should a regular user download?
+### How should a regular user install it?
 
-Download `crontab-formatter-0.3.0.vsix` from [GitHub Releases](https://github.com/e-u-shapovalov/crontab-formatter/releases), then use **Install from VSIX…** in VS Code.
+Install **Crontab Formatter** from the Visual Studio Marketplace in the VS Code Extensions view. If you prefer an offline install, download the `.vsix` asset from the latest [GitHub Release](https://github.com/e-u-shapovalov/crontab-formatter/releases) and use **Install from VSIX…**.
 
 ### Why should I not use Code → Download ZIP?
 
@@ -262,7 +253,7 @@ The formatter can add a leading seconds field and a trailing year field when con
 
 ### Which interface languages are available?
 
-The extension provides English and Russian messages and explanations. Package settings and command titles are localized according to the VS Code display language, subject to the published version 0.3.0 Code Action limitation noted above.
+The extension provides English and Russian messages and explanations. Diagnostics, hover text and quick-fix titles follow `crontabFormatter.locale`; the settings page and command-palette titles follow the VS Code display language.
 
 ## Building from source
 
@@ -288,7 +279,7 @@ Create a VSIX and install that build:
 
 ```shell
 npm run package
-code --install-extension crontab-formatter-0.3.0.vsix
+code --install-extension crontab-formatter-1.0.0.vsix
 ```
 
 The packaging script invokes `npx vsce package --ignoreFile .vsce-pack-ignore`; `npx` may need network access to obtain the packaging tool when it is not already cached. The repository does not include a tracked VS Code launch configuration for an Extension Development Host.

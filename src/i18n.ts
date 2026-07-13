@@ -1,6 +1,6 @@
 /**
  * Tiny localization layer. Pure (no vscode). Messages are functions so they can
- * take parameters. Russian is the default; English is the fallback.
+ * take parameters. English is the default; it is also the fallback locale.
  */
 
 import { Locale } from "./types";

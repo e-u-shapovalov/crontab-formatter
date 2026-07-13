@@ -174,9 +174,9 @@ Open the Extensions view, select the gear next to Crontab Formatter, and choose 
 | `crontabFormatter.formatMacros` | `true` | Align supported `@macro` lines. |
 | `crontabFormatter.validateOnSave` | `true` | Enable soft diagnostics while editing and when opening or saving a file. |
 | `crontabFormatter.explainHover` | `true` | Show a plain-language schedule explanation on hover. |
-| `crontabFormatter.locale` | `ru` | Use `ru`, `en`, or `auto` for extension messages and explanations. |
+| `crontabFormatter.locale` | `en` | Use `en`, `ru`, or `auto` for extension messages and explanations. |
 
-Settings descriptions follow the VS Code display language. `crontabFormatter.locale` controls this extension's diagnostics, messages, and explanations; its current default is Russian.
+Settings descriptions follow the VS Code display language. `crontabFormatter.locale` controls this extension's diagnostics, messages, and explanations; its current default is English.
 
 ## Redirect reminder
 

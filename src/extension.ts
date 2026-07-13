@@ -30,7 +30,7 @@ function readSettings(document: vscode.TextDocument): FormatterSettings {
 
 function readLocale(document: vscode.TextDocument): Locale {
   const c = vscode.workspace.getConfiguration("crontabFormatter", document.uri);
-  const v = c.get<string>("locale", "ru");
+  const v = c.get<string>("locale", "en");
   if (v === "ru" || v === "en") {
     return v;
   }

@@ -2,7 +2,7 @@
   "name": "crontab-formatter",
   "displayName": "Crontab Formatter",
   "description": "%ext.description%",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "publisher": "EvgeniiShapovalov",
   "icon": "images/cronformat.png",
   "author": "EvgeniiShapovalov (https://github.com/e-u-shapovalov)",
@@ -215,7 +215,7 @@
             "%config.locale.enum.ru%",
             "%config.locale.enum.en%"
           ],
-          "default": "ru",
+          "default": "en",
           "markdownDescription": "%config.locale.desc%"
         }
       }

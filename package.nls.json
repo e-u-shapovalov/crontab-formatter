@@ -32,7 +32,7 @@
   "config.validateOnSave.desc": "Run soft diagnostics (out-of-range fields, `*/0`, reversed ranges, unknown macros, missing user, missing redirect), refreshed while editing and on open/save. These are hints/warnings only — they never block formatting.",
   "config.explainHover.desc": "When you hover over a schedule, show a plain-language description of when it runs (powered by cronstrue).",
 
-  "config.locale.desc": "Language for this extension's own messages, hints and hover explanations.\n\n- `ru` — Russian (default).\n- `en` — English.\n- `auto` — follow the VS Code display language.\n\nNote: the **settings descriptions** on this page follow the VS Code display language, not this option.",
+  "config.locale.desc": "Language for this extension's own messages, hints and hover explanations.\n\n- `en` — English (default).\n- `ru` — Russian.\n- `auto` — follow the VS Code display language.\n\nNote: the **settings descriptions** on this page follow the VS Code display language, not this option.",
   "config.locale.enum.auto": "Follow the VS Code display language.",
   "config.locale.enum.ru": "Russian.",
   "config.locale.enum.en": "English."

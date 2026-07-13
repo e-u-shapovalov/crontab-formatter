@@ -6,6 +6,10 @@ All notable changes to the Crontab Formatter extension are documented in this fi
 
 ## English
 
+### 1.0.1
+
+- Changed the default value of `crontabFormatter.locale` from `ru` to `en`, so the extension's messages, hover explanations and quick-fix titles are in English out of the box. Set `crontabFormatter.locale` to `ru` for Russian or `auto` to follow the VS Code display language.
+
 ### 1.0.0
 
 First stable release, published to the Visual Studio Marketplace.
@@ -30,6 +34,10 @@ Initial public release.
 - Bundled TextMate grammar for crontab syntax highlighting.
 
 ## Русский
+
+### 1.0.1
+
+- Значение по умолчанию `crontabFormatter.locale` изменено с `ru` на `en`, поэтому сообщения расширения, всплывающие расшифровки и названия быстрых исправлений «из коробки» на английском. Установите `crontabFormatter.locale` в `ru` для русского языка или `auto`, чтобы следовать языку интерфейса VS Code.
 
 ### 1.0.0
 

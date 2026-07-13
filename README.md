@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="https://raw.githubusercontent.com/e-u-shapovalov/crontab-formatter/main/images/cronformat.png" alt="Crontab Formatter" width="128">
+</p>
+
 # Crontab Formatter for VS Code
 
 [Русская версия](README.RU.md)

@@ -30,7 +30,8 @@ test("handles a leading seconds field", () => {
     s({ mode: "user", secondsField: "true" }),
     "en"
   );
-  assert.ok(out, String(out));
+  // "30 0 9 * * *" => sec 30, min 0, hour 9
+  assert.ok(out && /\b30\b/.test(out) && /09/.test(out), String(out));
 });
 
 test("returns null for a zero-step schedule (consistent with the warning)", () => {

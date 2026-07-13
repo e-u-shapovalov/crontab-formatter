@@ -67,11 +67,24 @@ export function maskNonTopLevel(s: string): string {
       continue;
     }
 
-    // A command / process substitution can open at the top level and inside a
-    // double quote or another substitution.
-    if ((c === "$" || c === "<" || c === ">") && s[i + 1] === "(") {
+    // `$(` is a command substitution — valid at the top level, inside double
+    // quotes and inside another substitution.
+    if (c === "$" && s[i + 1] === "(") {
       stack.push({ type: "subst", depth: 0 });
       out += "  "; // blank the marker and `(`
+      i++;
+      continue;
+    }
+    // `<(` / `>(` are process substitutions. They are NOT performed inside double
+    // quotes (there they are literal text), so only open one at the top level or
+    // inside another substitution.
+    if (
+      (c === "<" || c === ">") &&
+      s[i + 1] === "(" &&
+      !(top && top.type === "double")
+    ) {
+      stack.push({ type: "subst", depth: 0 });
+      out += "  ";
       i++;
       continue;
     }
@@ -105,17 +118,32 @@ export function maskNonTopLevel(s: string): string {
   return out;
 }
 
+/** True when the character at index `j` is escaped by an odd-length run of
+ *  backslashes immediately before it. */
+function isEscaped(s: string, j: number): boolean {
+  let n = 0;
+  for (let k = j - 1; k >= 0 && s[k] === "\\"; k--) {
+    n++;
+  }
+  return n % 2 === 1;
+}
+
 /**
  * Detect a trailing inline comment that is safe to split off (a `#` outside any
- * quotes/backticks/`$(...)`, preceded by whitespace). Returns null when none is
- * found.
+ * quotes/backticks/`$(...)`, preceded by *unescaped* whitespace — an escaped
+ * space like `\ ` is part of a word, not a separator). Returns null otherwise.
  */
 export function detectTrailingComment(
   cmd: string
 ): { code: string; comment: string } | null {
   const mask = maskNonTopLevel(cmd);
   for (let i = 0; i < mask.length; i++) {
-    if (mask[i] === "#" && i > 0 && /\s/.test(cmd[i - 1])) {
+    if (
+      mask[i] === "#" &&
+      i > 0 &&
+      /\s/.test(cmd[i - 1]) &&
+      !isEscaped(cmd, i - 1)
+    ) {
       return { code: cmd.slice(0, i).replace(/\s+$/, ""), comment: cmd.slice(i) };
     }
   }
@@ -150,10 +178,11 @@ export function detectRedirect(
     if (p === "&" || /[0-9]/.test(p)) start--;
     else break;
   }
-  // The redirect operator (with any fd/& prefix) must be a standalone token.
-  // If a non-whitespace character precedes it, it is fused to the previous word
-  // (or is a `<>`/`3<>` compound) — splitting would alter the command.
-  if (start > 0 && !/\s/.test(code[start - 1])) {
+  // The redirect operator (with any fd/& prefix) must be a standalone token: it
+  // must be preceded by *unescaped* whitespace (or the start of the command).
+  // A non-whitespace char means it is fused to the previous word (`python2>`,
+  // `cmd&>`) or a `<>` compound; an escaped space (`\ >`) is part of the word.
+  if (start > 0 && (!/\s/.test(code[start - 1]) || isEscaped(code, start - 1))) {
     return null;
   }
   const body = code.slice(0, start).replace(/\s+$/, "");
@@ -182,14 +211,20 @@ export interface RedirectState {
  * substitutions are ignored via `maskNonTopLevel`.
  */
 export function analyzeRedirects(command: string): RedirectState {
-  const code = maskNonTopLevel(command);
-  // A typo like `>1&2` (fd/`&` glued to `>` with no spaces). `> 2 &` (redirect
-  // to a file then background) is valid and must NOT match.
-  const badMatch = code.match(/>\d+&\d*/);
+  // A trailing shell comment is not part of the command; ignore it so a `>`
+  // inside it is never counted (callers may or may not have stripped it).
+  const tc = detectTrailingComment(command);
+  const code = maskNonTopLevel(tc ? tc.code : command);
+  // Typos with fd/`&` glued to `>` and no spaces: `>1&2` and the non-existent
+  // `2>>&1` (`>>&` is a syntax error). A valid `> 2 &` (redirect to a file then
+  // background) must NOT match.
+  const badMatch = code.match(/>\d+&\d*|>>\s*&/);
   // sinks: false = console (cron mail), true = a file/sink
   let fd1 = false;
   let fd2 = false;
-  const re = /(\d*)>&(\d+)|&>>?|>&|(\d*)>>?\|?|(\d*)<>|(\d*)</g;
+  // The dup form `N>&M` requires M to be a bare fd number (token boundary), so
+  // `>&2026.log` is treated as a filename, not a dup to fd 2026.
+  const re = /(\d*)>&(\d+)(?![\w.])|&>>?|>&|(\d*)>>?\|?|(\d*)<>|(\d*)</g;
   let m: RegExpExecArray | null;
   while ((m = re.exec(code)) !== null) {
     if (m[0] === "") {
@@ -197,7 +232,7 @@ export function analyzeRedirects(command: string): RedirectState {
       continue;
     }
     if (m[2] !== undefined) {
-      // duplication: (m1 || 1)>&(m2)
+      // duplication: (m1 || 1)>&(m2) — fd m1 takes fd m2's current sink
       const from = m[1] === "" ? 1 : parseInt(m[1], 10);
       const to = parseInt(m[2], 10);
       const src: boolean = to === 1 ? fd1 : to === 2 ? fd2 : false;
@@ -210,24 +245,19 @@ export function analyzeRedirects(command: string): RedirectState {
       fd1 = true;
       fd2 = true;
     } else if (m[0] === ">&") {
-      // `>&file` (no fd after `&`) is an alias for `1>file` — stdout only.
-      fd1 = true;
-    } else if (m[0].includes(">")) {
-      // `>`, `>>`, `2>`, `2>>`, `>|` — a plain file redirect on fd (m3 || 1),
-      // optionally followed by an `&N` duplication (`2>>&1`).
-      const fd = !m[3] ? 1 : parseInt(m[3], 10);
-      const dup = code.slice(re.lastIndex).match(/^&(\d+)/);
-      if (dup) {
-        const to = parseInt(dup[1], 10);
-        const src: boolean = to === 1 ? fd1 : to === 2 ? fd2 : false;
-        if (fd === 1) fd1 = src;
-        else if (fd === 2) fd2 = src;
-        re.lastIndex += dup[0].length;
-      } else if (fd === 1) {
+      // `>&word`: `>&-` closes stdout; otherwise `>&file` redirects BOTH streams
+      // to the file (bash: `>&word` ≡ `>word 2>&1`). The `>&N` dup form is above.
+      if (code[re.lastIndex] === "-") {
         fd1 = true;
-      } else if (fd === 2) {
+      } else {
+        fd1 = true;
         fd2 = true;
       }
+    } else if (m[0].includes(">")) {
+      // `>`, `>>`, `2>`, `2>>`, `>|` — a plain file redirect on fd (m3 || 1).
+      const fd = !m[3] ? 1 : parseInt(m[3], 10);
+      if (fd === 1) fd1 = true;
+      else if (fd === 2) fd2 = true;
     }
   }
   return { stdout: fd1, stderr: fd2, bad: badMatch ? badMatch[0].trim() : null };
@@ -404,8 +434,8 @@ export function formatParsed(
     const headerPresent =
       !!firstContent &&
       firstContent.kind === "comment" &&
-      /min/i.test(firstContent.raw) &&
-      /command/i.test(firstContent.raw);
+      /\bmin\b/i.test(firstContent.raw) &&
+      /\bcommand\b/i.test(firstContent.raw);
     if (!headerPresent) {
       const headParts = labels.map((l, i) => l.padEnd(fieldWidths[i]));
       let header = "# " + headParts.join(sep);

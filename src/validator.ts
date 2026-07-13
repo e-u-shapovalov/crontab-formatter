@@ -45,10 +45,11 @@ export function validateDocument(
         return;
       }
       const r = analyzeRedirects(code);
+      // A malformed redirect gets a single, focused hint — the fd-state is
+      // unreliable, so don't also emit no-redirect / stderr-not-redirected.
       if (r.bad) {
         push(t(locale, "bad-redirect", r.bad), "warning", "bad-redirect");
-      }
-      if (!r.stdout) {
+      } else if (!r.stdout) {
         push(t(locale, "no-redirect"), "info", "no-redirect");
       } else if (!r.stderr) {
         push(t(locale, "stderr-not-redirected"), "info", "stderr-not-redirected");

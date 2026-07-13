@@ -1,7 +1,12 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { formatDocument, analyzeRedirects } from "../src/formatter";
+import {
+  formatDocument,
+  analyzeRedirects,
+  detectTrailingComment,
+  maskNonTopLevel,
+} from "../src/formatter";
 import { DEFAULT_SETTINGS, FormatterSettings } from "../src/types";
 
 function s(overrides: Partial<FormatterSettings> = {}): FormatterSettings {
@@ -490,19 +495,72 @@ test("alignRedirects does not split a > inside a trailing comment", () => {
   assert.equal(out, "0  0  *  *  *  " + cmd);
 });
 
-// 29. fd analysis distinguishes >&file (stdout only) from &>file (both) and
-// handles 2>>&1; the bad-redirect hint no longer fires on a valid `> 2 &`
-test("analyzeRedirects distinguishes >&file, &>file and 2>>&1", () => {
+// 29. `>&word` and `&>word` redirect BOTH streams to the file (bash 3.6.4);
+// only `>&N` (bare fd number) is a duplication. `>&2026.log` is a filename.
+test("analyzeRedirects: >&file and &>file redirect both streams", () => {
   const st = (c: string) => {
     const r = analyzeRedirects(c);
     return [r.stdout, r.stderr];
   };
-  assert.deepEqual(st("cmd >&file"), [true, false]);
+  assert.deepEqual(st("cmd >&file"), [true, true]);
+  assert.deepEqual(st("cmd >&/var/log/x.log"), [true, true]);
   assert.deepEqual(st("cmd &>file"), [true, true]);
-  assert.deepEqual(st("cmd 2>>&1"), [false, false]);
+  assert.deepEqual(st("cmd >&2"), [false, false]); // dup stdout -> fd2 (console)
+  assert.deepEqual(st("cmd >&2026.log"), [true, true]); // filename, not a dup
 });
 
-test("bad-redirect flags >1&2 but not a valid > 2 &", () => {
+test("bad-redirect flags >1&2 and 2>>&1 but not a valid > 2 &", () => {
   assert.notEqual(analyzeRedirects("cmd >1&2").bad, null);
+  assert.notEqual(analyzeRedirects("cmd 2>>&1").bad, null); // >>& is a syntax error
   assert.equal(analyzeRedirects("cmd > 2 &").bad, null);
+});
+
+// 30. `<(` / `>(` inside double quotes are literal, not process substitution,
+// so a real redirect after the string is still detected
+test("process substitution markers inside double quotes are literal", () => {
+  assert.equal(analyzeRedirects('echo "a >(" > /log').stdout, true);
+  assert.equal(analyzeRedirects('echo "x <(" > /log').stdout, true);
+  // a genuine top-level process substitution is still masked
+  assert.equal(analyzeRedirects("diff <(a) <(b) > /log").stdout, true);
+  assert.equal(analyzeRedirects('echo "$(date)" > /log').stdout, true);
+});
+
+test("a # inside a substitution is not a trailing comment", () => {
+  assert.equal(detectTrailingComment('echo "$(x # y)" z'), null);
+  assert.equal(detectTrailingComment("echo $(a # b)"), null);
+  assert.equal(detectTrailingComment("cmd # note")?.comment, "# note");
+});
+
+// 31. a # after an escaped space is part of the word, not a comment
+test("a # after an escaped space is not a trailing comment", () => {
+  assert.equal(detectTrailingComment("rm /tmp/x\\ y\\ #daily"), null);
+  // an escaped backslash leaves the following space unescaped => real comment
+  assert.equal(detectTrailingComment("a\\\\ #b")?.comment, "#b");
+  // alignComments must not change the bytes of a command with escaped spaces
+  const input = "0 0 * * * rm /tmp/x\\ y\\ #daily";
+  const out = formatDocument(input, s({ mode: "user", alignComments: true }));
+  assert.equal(out, "0  0  *  *  *  rm /tmp/x\\ y\\ #daily");
+});
+
+// 32. insertHeader must not be fooled by substrings like "Admin"/"commands"
+test("insertHeader is inserted even when a comment contains min/command substrings", () => {
+  const input = ["# Admin commands below", "0 5 * * * /a"].join("\n");
+  const out = formatDocument(input, s({ mode: "user", insertHeader: true }));
+  assert.equal(out.split("\n").length, 3, out);
+  assert.ok(/^# min\b/.test(out.split("\n")[0]), out);
+});
+
+// 33. the mask preserves length on adversarial inputs (index-alignment invariant)
+test("maskNonTopLevel preserves length on adversarial inputs", () => {
+  for (const c of [
+    'mail -s "$(printf "a > b")" x',
+    "cmd \\$(date > /x)",
+    "echo 'no close",
+    "echo $(a $(b > c) d) > e",
+    "a\\\\\\\" > f",
+    "diff <(x) >(y) > f",
+    "((nested > x) > out",
+  ]) {
+    assert.equal(maskNonTopLevel(c).length, c.length, JSON.stringify(c));
+  }
 });

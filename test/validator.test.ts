@@ -87,9 +87,9 @@ test("2>&1 before a stdout redirect leaves stderr on the console", () => {
   assert.ok(!c.includes("no-redirect"), JSON.stringify(c));
 });
 
-test(">&file redirects only stdout, so stderr is flagged", () => {
+test(">&file redirects both streams, so no redirect hint fires", () => {
   const c = codes("* * * * * cmd >&file");
-  assert.ok(c.includes("stderr-not-redirected"), JSON.stringify(c));
+  assert.ok(!c.includes("stderr-not-redirected"), JSON.stringify(c));
   assert.ok(!c.includes("no-redirect"), JSON.stringify(c));
 });
 
@@ -97,6 +97,13 @@ test("a > inside a nested-quote substitution is not counted as a redirect", () =
   const c = codes('* * * * * mail -s "$(printf "a > b")" x');
   assert.ok(c.includes("no-redirect"), JSON.stringify(c));
   assert.ok(!c.includes("stderr-not-redirected"), JSON.stringify(c));
+});
+
+test("a malformed redirect gets only the bad-redirect hint", () => {
+  const c = codes("* * * * * /bin/x > /var/log/x.log >1&2");
+  assert.ok(c.includes("bad-redirect"), JSON.stringify(c));
+  assert.ok(!c.includes("stderr-not-redirected"), JSON.stringify(c));
+  assert.ok(!c.includes("no-redirect"), JSON.stringify(c));
 });
 
 test("system mode without a user is flagged", () => {

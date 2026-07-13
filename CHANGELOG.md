@@ -6,6 +6,10 @@ All notable changes to the Crontab Formatter extension are documented in this fi
 
 ## English
 
+### 1.0.2
+
+- With `crontabFormatter.alignRedirects` on, manual padding after a redirect operator is now collapsed, so `>        /dev/null 2>&1` lines up as `> /dev/null 2>&1`. Runs of whitespace inside the redirect are reduced to a single space; quoted or escaped whitespace and fused forms such as `>&2` are left untouched, so the command's meaning never changes.
+
 ### 1.0.1
 
 - Changed the default value of `crontabFormatter.locale` from `ru` to `en`, so the extension's messages, hover explanations and quick-fix titles are in English out of the box. Set `crontabFormatter.locale` to `ru` for Russian or `auto` to follow the VS Code display language.
@@ -34,6 +38,10 @@ Initial public release.
 - Bundled TextMate grammar for crontab syntax highlighting.
 
 ## Русский
+
+### 1.0.2
+
+- При включённом `crontabFormatter.alignRedirects` ручные отступы после оператора перенаправления теперь схлопываются, поэтому `>        /dev/null 2>&1` выравнивается как `> /dev/null 2>&1`. Прогоны пробелов внутри перенаправления сжимаются до одного пробела; пробелы в кавычках или экранированные, а также слитные формы вроде `>&2` не трогаются, поэтому смысл команды не меняется.
 
 ### 1.0.1
 

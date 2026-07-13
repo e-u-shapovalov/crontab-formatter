@@ -192,6 +192,91 @@ export function detectRedirect(
   return { body, redirect: code.slice(start).replace(/\s+$/, "") };
 }
 
+/**
+ * Collapse each run of *top-level* whitespace inside a redirect tail to a single
+ * space, so a manually padded `>        /dev/null 2>&1` lines up as
+ * `> /dev/null 2>&1`. Whitespace inside quotes/backticks/substitutions and an
+ * escaped space (`\ `) are kept verbatim, so a quoted target such as
+ * `>> "/var/log/my log.txt"` is never altered. A run is collapsed to a single
+ * space, never removed: the gap after a redirect operator is optional, but the
+ * gap between the target and the next token is a required separator, and a fused
+ * form like `>&2` must not be split. This keeps the shell tokenisation and the
+ * result idempotent.
+ */
+export function normalizeRedirectSpacing(s: string): string {
+  let out = "";
+  const stack: { type: "single" | "double" | "backtick" | "subst"; depth: number }[] = [];
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    const top = stack.length > 0 ? stack[stack.length - 1] : undefined;
+
+    if (top && top.type === "single") {
+      out += c;
+      if (c === "'") stack.pop();
+      continue;
+    }
+    if (c === "\\") {
+      out += c;
+      if (i + 1 < s.length) {
+        out += s[i + 1];
+        i++;
+      }
+      continue;
+    }
+    if (top && top.type === "backtick") {
+      out += c;
+      if (c === "`") stack.pop();
+      continue;
+    }
+    if (c === "$" && s[i + 1] === "(") {
+      stack.push({ type: "subst", depth: 0 });
+      out += "$(";
+      i++;
+      continue;
+    }
+    if (
+      (c === "<" || c === ">") &&
+      s[i + 1] === "(" &&
+      !(top && top.type === "double")
+    ) {
+      stack.push({ type: "subst", depth: 0 });
+      out += c + "(";
+      i++;
+      continue;
+    }
+    if (top && top.type === "subst") {
+      if (c === "(") top.depth++;
+      else if (c === ")") {
+        if (top.depth === 0) stack.pop();
+        else top.depth--;
+      } else if (c === "'") stack.push({ type: "single", depth: 0 });
+      else if (c === '"') stack.push({ type: "double", depth: 0 });
+      else if (c === "`") stack.push({ type: "backtick", depth: 0 });
+      out += c;
+      continue;
+    }
+    if (top && top.type === "double") {
+      if (c === '"') stack.pop();
+      else if (c === "`") stack.push({ type: "backtick", depth: 0 });
+      out += c;
+      continue;
+    }
+
+    // Top level (stack empty).
+    if (c === "'") { stack.push({ type: "single", depth: 0 }); out += c; continue; }
+    if (c === '"') { stack.push({ type: "double", depth: 0 }); out += c; continue; }
+    if (c === "`") { stack.push({ type: "backtick", depth: 0 }); out += c; continue; }
+    if (c === "(") { stack.push({ type: "subst", depth: 0 }); out += c; continue; }
+    if (/\s/.test(c)) {
+      out += " ";
+      while (i + 1 < s.length && /\s/.test(s[i + 1])) i++;
+      continue;
+    }
+    out += c;
+  }
+  return out;
+}
+
 export interface RedirectState {
   /** True when fd 1 (stdout) ends up at a file/sink rather than the console. */
   stdout: boolean;
@@ -282,7 +367,7 @@ function splitTail(
     const rd = detectRedirect(code);
     if (rd) {
       body = rd.body;
-      redirect = rd.redirect;
+      redirect = normalizeRedirectSpacing(rd.redirect);
     }
   }
   return { body, redirect, comment };

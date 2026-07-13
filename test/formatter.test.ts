@@ -6,6 +6,7 @@ import {
   analyzeRedirects,
   detectTrailingComment,
   maskNonTopLevel,
+  normalizeRedirectSpacing,
 } from "../src/formatter";
 import { DEFAULT_SETTINGS, FormatterSettings } from "../src/types";
 
@@ -407,6 +408,52 @@ test("alignRedirects still aligns a real redirect after a $() body", () => {
   assert.ok(c0 > 0 && c0 === c1, out);
   assert.ok(out.includes("echo $(date)"), out);
   assert.ok(out.includes("/bin/b $(id)"), out);
+});
+
+// 24b. alignRedirects collapses manual padding after > / >> to a single space
+test("alignRedirects collapses padded whitespace after the redirect operator", () => {
+  const input = [
+    "*/2 * * * * /usr/bin/wget -O /dev/null http://x >              /dev/null 2>&1",
+    "*/2 * * * * cd /app && php run.php >>      run_$(date).log 2>&1",
+  ].join("\n");
+  const out = formatDocument(input, s({ mode: "user", alignRedirects: true }));
+  const lines = out.split("\n");
+  assert.ok(lines[0].includes("> /dev/null 2>&1"), lines[0]);
+  assert.ok(!lines[0].includes(">  /dev/null"), lines[0]);
+  assert.ok(lines[1].includes(">> run_$(date).log 2>&1"), lines[1]);
+  // still idempotent
+  assert.equal(
+    formatDocument(out, s({ mode: "user", alignRedirects: true })),
+    out
+  );
+});
+
+// 24c. the collapse never touches quoted or escaped whitespace in the target
+test("normalizeRedirectSpacing keeps quoted and escaped whitespace verbatim", () => {
+  // a run of top-level spaces collapses to one
+  assert.equal(normalizeRedirectSpacing(">      /dev/null"), "> /dev/null");
+  // a single space and a fused form are left as-is
+  assert.equal(normalizeRedirectSpacing("> /dev/null 2>&1"), "> /dev/null 2>&1");
+  assert.equal(normalizeRedirectSpacing(">/dev/null"), ">/dev/null");
+  // a space inside a quoted filename is preserved
+  assert.equal(
+    normalizeRedirectSpacing('>>   "/var/log/my log.txt"'),
+    '>> "/var/log/my log.txt"'
+  );
+  // an escaped space is part of the word, not a separator
+  assert.equal(normalizeRedirectSpacing(">  a\\ b 2>&1"), "> a\\ b 2>&1");
+  // whitespace inside $(...) is left alone; the top-level run collapses
+  assert.equal(
+    normalizeRedirectSpacing(">>    x_$(date +\\%Y \\%m).log"),
+    ">> x_$(date +\\%Y \\%m).log"
+  );
+});
+
+// 24d. a quoted-space redirect target survives alignRedirects byte-for-byte
+test("alignRedirects preserves a quoted redirect target", () => {
+  const input = '0 0 * * * echo hi >> "/var/log/my log.txt"';
+  const out = formatDocument(input, s({ mode: "user", alignRedirects: true }));
+  assert.ok(out.endsWith('>> "/var/log/my log.txt"'), out);
 });
 
 // 25. the redirect analyzer (shared by validator + code actions) ignores a >
